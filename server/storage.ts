@@ -1,38 +1,42 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { db } from "./db";
+import { gifts, type InsertGift, type Gift, type UpdateGiftStatusRequest } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createGift(gift: InsertGift): Promise<Gift>;
+  getGift(id: string): Promise<Gift | undefined>;
+  updateGiftStatus(id: string, updates: UpdateGiftStatusRequest): Promise<Gift | undefined>;
+  // For demo/dashboard purposes
+  getGiftsBySender(senderAddress: string): Promise<Gift[]>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  async createGift(insertGift: InsertGift): Promise<Gift> {
+    const [gift] = await db.insert(gifts).values(insertGift).returning();
+    return gift;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async getGift(id: string): Promise<Gift | undefined> {
+    const [gift] = await db.select().from(gifts).where(eq(gifts.id, id));
+    return gift;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async updateGiftStatus(id: string, updates: UpdateGiftStatusRequest): Promise<Gift | undefined> {
+    const [updated] = await db
+      .update(gifts)
+      .set({
+        status: updates.status,
+        receiverAddress: updates.receiverAddress,
+        claimTxHash: updates.claimTxHash,
+      })
+      .where(eq(gifts.id, id))
+      .returning();
+    return updated;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async getGiftsBySender(senderAddress: string): Promise<Gift[]> {
+    return await db.select().from(gifts).where(eq(gifts.senderAddress, senderAddress));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
