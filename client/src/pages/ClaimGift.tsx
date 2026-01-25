@@ -74,7 +74,26 @@ export default function ClaimGift() {
   if (!gift) return <div className="min-h-screen flex items-center justify-center">Gift not found</div>;
 
   const bgClass = THEME_CLASSES[gift.theme] || 'bg-white';
-  const senderName = (gift.visualAssets as any)?.senderName || 'Someone';
+  const visualAssets = (gift.visualAssets as any) || {};
+  const senderName = visualAssets.senderName || 'Someone';
+  const bgImage = visualAssets.bgImage;
+  const sticker = visualAssets.sticker;
+  const colorScheme = visualAssets.colorScheme;
+
+  const SCHEME_OVERLAYS: Record<string, string> = {
+    warm: 'bg-orange-500/10',
+    cool: 'bg-blue-500/10',
+    vibrant: 'bg-purple-500/10',
+    default: ''
+  };
+
+  const STICKERS: Record<string, string> = {
+    cake: '🎂',
+    party: '🥳',
+    heart: '❤️',
+    star: '⭐',
+    coffee: '☕'
+  };
 
   return (
     <div className={`min-h-screen flex flex-col transition-colors duration-1000 ${isOpened ? 'bg-gray-50' : 'bg-background'}`}>
@@ -82,7 +101,17 @@ export default function ClaimGift() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
         {/* Ambient background for the theme */}
-        <div className={`absolute inset-0 opacity-20 transition-opacity duration-1000 ${bgClass} -z-10`} />
+        {bgImage ? (
+          <div 
+            className="absolute inset-0 opacity-40 bg-cover bg-center -z-10 transition-opacity duration-1000"
+            style={{ backgroundImage: `url(${bgImage})` }}
+          />
+        ) : (
+          <div className={`absolute inset-0 opacity-20 transition-opacity duration-1000 ${bgClass} -z-10`} />
+        )}
+        {colorScheme && (
+          <div className={`absolute inset-0 ${SCHEME_OVERLAYS[colorScheme]} -z-10 transition-opacity duration-1000`} />
+        )}
 
         <AnimatePresence mode="wait">
           {!isOpened ? (
@@ -119,19 +148,24 @@ export default function ClaimGift() {
               transition={{ delay: 0.3, type: "spring" }}
               className="w-full max-w-md"
             >
-              <Card className={`overflow-hidden border-none shadow-2xl rounded-3xl`}>
-                <div className={`p-12 text-center relative ${bgClass}`}>
+              <Card className={`overflow-hidden border-none shadow-2xl rounded-3xl w-full`}>
+                <div className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[300px] ${bgClass}`}>
                    {/* Decorative circle */}
                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/20 rounded-full blur-2xl" />
                    
-                   <div className="relative z-10">
-                     <p className="font-handwriting text-2xl mb-6 leading-relaxed text-foreground/80">"{gift.message}"</p>
+                   <div className="relative z-10 w-full flex flex-col items-center">
+                     {sticker && (
+                       <div className="text-6xl mb-4 animate-bounce">
+                         {STICKERS[sticker]}
+                       </div>
+                     )}
+                     <p className="font-handwriting text-2xl mb-6 leading-relaxed text-foreground/80 max-w-xs mx-auto">"{gift.message}"</p>
                      
-                     <div className="text-6xl font-display font-bold text-foreground my-8 drop-shadow-sm">
+                     <div className="text-6xl font-display font-bold text-foreground my-4 drop-shadow-sm">
                        ${gift.amount} <span className="text-3xl text-foreground/60">USDC</span>
                      </div>
                      
-                     <p className="text-sm font-bold uppercase tracking-widest text-foreground/50">From {senderName}</p>
+                     <p className="text-sm font-bold uppercase tracking-widest text-foreground/50 mt-4">From {senderName}</p>
                    </div>
                 </div>
 

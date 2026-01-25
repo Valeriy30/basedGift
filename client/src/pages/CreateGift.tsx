@@ -39,6 +39,9 @@ export default function CreateGift() {
     message: '',
     theme: 'birthday',
     senderName: '',
+    bgImage: '',
+    sticker: '',
+    colorScheme: 'default',
   });
 
   const handleNext = () => {
@@ -66,7 +69,12 @@ export default function CreateGift() {
         amount: formData.amount,
         message: formData.message,
         theme: formData.theme,
-        visualAssets: { senderName: formData.senderName },
+        visualAssets: { 
+          senderName: formData.senderName,
+          bgImage: formData.bgImage,
+          sticker: formData.sticker,
+          colorScheme: formData.colorScheme
+        },
         status: 'created'
       });
 
@@ -187,6 +195,50 @@ export default function CreateGift() {
                           onSelect={() => setFormData({ ...formData, theme: theme.id })}
                         />
                       ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <Label className="text-lg">Stickers & Backgrounds</Label>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Sticker</Label>
+                        <select 
+                          className="w-full h-10 rounded-lg border-2 bg-white px-3"
+                          value={formData.sticker}
+                          onChange={(e) => setFormData({ ...formData, sticker: e.target.value })}
+                        >
+                          <option value="">None</option>
+                          <option value="cake">🎂 Cake</option>
+                          <option value="party">🥳 Party</option>
+                          <option value="heart">❤️ Heart</option>
+                          <option value="star">⭐ Star</option>
+                          <option value="coffee">☕ Coffee</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Background Style</Label>
+                        <select 
+                          className="w-full h-10 rounded-lg border-2 bg-white px-3"
+                          value={formData.colorScheme}
+                          onChange={(e) => setFormData({ ...formData, colorScheme: e.target.value })}
+                        >
+                          <option value="default">Default</option>
+                          <option value="warm">Warm Glow</option>
+                          <option value="cool">Cool Breeze</option>
+                          <option value="vibrant">Vibrant Energy</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="bgImage" className="text-sm text-muted-foreground">Custom Background Image URL (Optional)</Label>
+                      <Input 
+                        id="bgImage"
+                        placeholder="https://images.unsplash.com/..."
+                        className="h-10 rounded-lg border-2"
+                        value={formData.bgImage}
+                        onChange={(e) => setFormData({ ...formData, bgImage: e.target.value })}
+                      />
                     </div>
                   </div>
 
