@@ -237,26 +237,12 @@ export default function CreateGift() {
                   </div>
 
                   <div className="space-y-4">
-                    <Label className="text-lg">Choose a Theme</Label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {THEMES.map((theme) => (
-                        <ThemeCard
-                          key={theme.id}
-                          {...theme}
-                          isSelected={formData.theme === theme.id}
-                          onSelect={() => setFormData({ ...formData, theme: theme.id })}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
                     <Label className="text-lg">Style & Decorations</Label>
                     
                     {/* iOS Style Sticker Picker */}
                     <div className="space-y-2">
                       <Label className="text-sm text-muted-foreground">Sticker</Label>
-                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                      <div className="flex gap-3 overflow-x-auto py-6 scrollbar-hide px-1">
                         {STICKERS.map((s) => (
                           <button
                             key={s.id}

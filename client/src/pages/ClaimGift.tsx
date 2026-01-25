@@ -115,18 +115,19 @@ export default function ClaimGift() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 1.5, opacity: 0 }}
-              className="text-center cursor-pointer"
+              className="text-center cursor-pointer flex flex-col items-center justify-center w-full"
               onClick={() => setIsOpened(true)}
             >
-              <div className="relative group">
+              <div className="relative group flex flex-col items-center justify-center w-full">
                 <motion.div
                   animate={{ y: [0, -10, 0] }}
                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  className="flex items-center justify-center w-full"
                 >
-                  <Gift size={180} strokeWidth={1} className="text-primary fill-primary/10 drop-shadow-2xl" />
+                  <Gift size={180} strokeWidth={1} className="text-primary fill-primary/10 drop-shadow-2xl mx-auto" />
                 </motion.div>
                 
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm px-6 py-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/90 backdrop-blur-sm px-6 py-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
                   <span className="font-bold text-primary">Click to Open!</span>
                 </div>
               </div>
@@ -145,14 +146,14 @@ export default function ClaimGift() {
             >
               <Card className={`overflow-hidden border-none shadow-2xl rounded-3xl w-full`}>
                 <div 
-                  className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[350px]`}
-                  style={{ backgroundColor: bgImage ? 'transparent' : colorScheme }}
+                  className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[350px] overflow-hidden`}
+                  style={{ backgroundColor: colorScheme }}
                 >
                    {bgImage && (
-                     <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${bgImage})` }} />
+                     <div className="absolute inset-0 bg-cover bg-center opacity-40 z-0" style={{ backgroundImage: `url(${bgImage})` }} />
                    )}
                    {/* Decorative circle */}
-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/30 rounded-full blur-3xl" />
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/30 rounded-full blur-3xl z-0" />
                    
                    <div className="relative z-10 w-full flex flex-col items-center justify-center">
                      {sticker && (
