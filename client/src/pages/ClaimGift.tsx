@@ -73,26 +73,25 @@ export default function ClaimGift() {
 
   if (!gift) return <div className="min-h-screen flex items-center justify-center">Gift not found</div>;
 
-  const bgClass = THEME_CLASSES[gift.theme] || 'bg-white';
   const visualAssets = (gift.visualAssets as any) || {};
   const senderName = visualAssets.senderName || 'Someone';
   const bgImage = visualAssets.bgImage;
   const sticker = visualAssets.sticker;
-  const colorScheme = visualAssets.colorScheme;
-
-  const SCHEME_OVERLAYS: Record<string, string> = {
-    warm: 'bg-orange-500/10',
-    cool: 'bg-blue-500/10',
-    vibrant: 'bg-purple-500/10',
-    default: ''
-  };
+  const colorScheme = visualAssets.colorScheme || '#3b82f6';
 
   const STICKERS: Record<string, string> = {
     cake: '🎂',
     party: '🥳',
     heart: '❤️',
     star: '⭐',
-    coffee: '☕'
+    coffee: '☕',
+    gift: '🎁',
+    balloon: '🎈',
+    champagne: '🥂',
+    flower: '🌸',
+    rocket: '🚀',
+    gem: '💎',
+    fire: '🔥',
   };
 
   return (
@@ -101,17 +100,13 @@ export default function ClaimGift() {
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 relative overflow-hidden">
         {/* Ambient background for the theme */}
-        {bgImage ? (
-          <div 
-            className="absolute inset-0 opacity-40 bg-cover bg-center -z-10 transition-opacity duration-1000"
-            style={{ backgroundImage: `url(${bgImage})` }}
-          />
-        ) : (
-          <div className={`absolute inset-0 opacity-20 transition-opacity duration-1000 ${bgClass} -z-10`} />
-        )}
-        {colorScheme && (
-          <div className={`absolute inset-0 ${SCHEME_OVERLAYS[colorScheme]} -z-10 transition-opacity duration-1000`} />
-        )}
+        <div 
+          className="absolute inset-0 opacity-40 bg-cover bg-center -z-10 transition-opacity duration-1000"
+          style={{ 
+            backgroundImage: bgImage ? `url(${bgImage})` : 'none',
+            backgroundColor: !bgImage ? colorScheme : 'transparent'
+          }}
+        />
 
         <AnimatePresence mode="wait">
           {!isOpened ? (
@@ -146,26 +141,33 @@ export default function ClaimGift() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, type: "spring" }}
-              className="w-full max-w-md"
+              className="w-full max-w-md mx-auto"
             >
               <Card className={`overflow-hidden border-none shadow-2xl rounded-3xl w-full`}>
-                <div className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[300px] ${bgClass}`}>
+                <div 
+                  className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[350px]`}
+                  style={{ backgroundColor: bgImage ? 'transparent' : colorScheme }}
+                >
+                   {bgImage && (
+                     <div className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${bgImage})` }} />
+                   )}
                    {/* Decorative circle */}
-                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/20 rounded-full blur-2xl" />
+                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-white/30 rounded-full blur-3xl" />
                    
-                   <div className="relative z-10 w-full flex flex-col items-center">
+                   <div className="relative z-10 w-full flex flex-col items-center justify-center">
                      {sticker && (
-                       <div className="text-6xl mb-4 animate-bounce">
+                       <div className="text-7xl mb-6 animate-bounce">
                          {STICKERS[sticker]}
                        </div>
                      )}
-                     <p className="font-handwriting text-2xl mb-6 leading-relaxed text-foreground/80 max-w-xs mx-auto">"{gift.message}"</p>
+                     <p className="font-handwriting text-2xl mb-6 leading-relaxed text-foreground/90 max-w-[280px] mx-auto text-center">"{gift.message}"</p>
                      
-                     <div className="text-6xl font-display font-bold text-foreground my-4 drop-shadow-sm">
-                       ${gift.amount} <span className="text-3xl text-foreground/60">USDC</span>
+                     <div className="text-6xl font-display font-bold text-foreground my-4 drop-shadow-md">
+                       {gift.tokenType === 'USDC' ? `$${gift.amount}` : gift.tokenId || 'NFT'} 
+                       <span className="text-2xl text-foreground/70 ml-2">{gift.tokenType}</span>
                      </div>
                      
-                     <p className="text-sm font-bold uppercase tracking-widest text-foreground/50 mt-4">From {senderName}</p>
+                     <p className="text-sm font-bold uppercase tracking-widest text-foreground/60 mt-6">From {senderName}</p>
                    </div>
                 </div>
 

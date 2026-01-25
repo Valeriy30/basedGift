@@ -25,6 +25,26 @@ const THEMES = [
   { id: 'just_because', name: 'Just Because', description: 'Surprise them for no reason.', colorClass: 'theme-just_because' },
 ];
 
+// iOS-style Stickers
+const STICKERS = [
+  { id: 'cake', emoji: '🎂' },
+  { id: 'party', emoji: '🥳' },
+  { id: 'heart', emoji: '❤️' },
+  { id: 'star', emoji: '⭐' },
+  { id: 'coffee', emoji: '☕' },
+  { id: 'gift', emoji: '🎁' },
+  { id: 'balloon', emoji: '🎈' },
+  { id: 'champagne', emoji: '🥂' },
+  { id: 'flower', emoji: '🌸' },
+  { id: 'rocket', emoji: '🚀' },
+  { id: 'gem', emoji: '💎' },
+  { id: 'fire', emoji: '🔥' },
+];
+
+const COLORS = [
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#71717a'
+];
+
 export default function CreateGift() {
   const [step, setStep] = useState(0);
   const [, setLocation] = useLocation();
@@ -41,8 +61,23 @@ export default function CreateGift() {
     senderName: '',
     bgImage: '',
     sticker: '',
-    colorScheme: 'default',
+    colorScheme: '#3b82f6',
+    nftId: '',
   });
+
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({ title: "Invalid file", description: "Please upload an image.", variant: "destructive" });
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setFormData(prev => ({ ...prev, bgImage: e.target?.result as string }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleNext = () => {
     if (step === 0 && !formData.amount) {
@@ -155,25 +190,42 @@ export default function CreateGift() {
                       <div className="bg-purple-100 p-3 rounded-full text-purple-600">
                         <ImageIcon size={32} />
                       </div>
-                      <span className="font-bold">NFT (Coming Soon)</span>
+                      <span className="font-bold">NFT</span>
                     </button>
                   </div>
 
-                  <div className="space-y-3 pt-4">
-                    <Label htmlFor="amount" className="text-lg">Amount (USDC)</Label>
-                    <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
-                      <Input 
-                        id="amount"
-                        type="number"
-                        placeholder="10.00"
-                        className="pl-8 h-14 text-xl rounded-xl border-2 focus-visible:ring-primary/20"
-                        value={formData.amount}
-                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                      />
+                  {formData.tokenType === 'USDC' ? (
+                    <div className="space-y-3 pt-4">
+                      <Label htmlFor="amount" className="text-lg">Amount (USDC)</Label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold">$</span>
+                        <Input 
+                          id="amount"
+                          type="number"
+                          placeholder="10.00"
+                          className="pl-8 h-14 text-xl rounded-xl border-2 focus-visible:ring-primary/20"
+                          value={formData.amount}
+                          onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">Balance: $1,240.50 USDC</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">Balance: $1,240.50 USDC</p>
-                  </div>
+                  ) : (
+                    <div className="space-y-3 pt-4">
+                      <Label className="text-lg">Select NFT</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[1, 2, 3].map(id => (
+                          <button
+                            key={id}
+                            onClick={() => setFormData({ ...formData, nftId: `NFT #${id}` })}
+                            className={`aspect-square rounded-xl border-2 flex items-center justify-center bg-muted/30 ${formData.nftId === `NFT #${id}` ? 'border-primary ring-2 ring-primary/20' : 'border-border'}`}
+                          >
+                            <ImageIcon size={24} className="text-muted-foreground" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -199,46 +251,81 @@ export default function CreateGift() {
                   </div>
 
                   <div className="space-y-4">
-                    <Label className="text-lg">Stickers & Backgrounds</Label>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">Sticker</Label>
-                        <select 
-                          className="w-full h-10 rounded-lg border-2 bg-white px-3"
-                          value={formData.sticker}
-                          onChange={(e) => setFormData({ ...formData, sticker: e.target.value })}
-                        >
-                          <option value="">None</option>
-                          <option value="cake">🎂 Cake</option>
-                          <option value="party">🥳 Party</option>
-                          <option value="heart">❤️ Heart</option>
-                          <option value="star">⭐ Star</option>
-                          <option value="coffee">☕ Coffee</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">Background Style</Label>
-                        <select 
-                          className="w-full h-10 rounded-lg border-2 bg-white px-3"
-                          value={formData.colorScheme}
-                          onChange={(e) => setFormData({ ...formData, colorScheme: e.target.value })}
-                        >
-                          <option value="default">Default</option>
-                          <option value="warm">Warm Glow</option>
-                          <option value="cool">Cool Breeze</option>
-                          <option value="vibrant">Vibrant Energy</option>
-                        </select>
+                    <Label className="text-lg">Style & Decorations</Label>
+                    
+                    {/* iOS Style Sticker Picker */}
+                    <div className="space-y-2">
+                      <Label className="text-sm text-muted-foreground">Sticker</Label>
+                      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        {STICKERS.map((s) => (
+                          <button
+                            key={s.id}
+                            onClick={() => setFormData({ ...formData, sticker: s.id })}
+                            className={`flex-shrink-0 w-12 h-12 flex items-center justify-center text-2xl rounded-full transition-all ${
+                              formData.sticker === s.id ? 'bg-primary/20 scale-110 ring-2 ring-primary' : 'bg-muted hover:bg-muted/80'
+                            }`}
+                          >
+                            {s.emoji}
+                          </button>
+                        ))}
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="bgImage" className="text-sm text-muted-foreground">Custom Background Image URL (Optional)</Label>
-                      <Input 
-                        id="bgImage"
-                        placeholder="https://images.unsplash.com/..."
-                        className="h-10 rounded-lg border-2"
-                        value={formData.bgImage}
-                        onChange={(e) => setFormData({ ...formData, bgImage: e.target.value })}
-                      />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Color Palette */}
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Theme Color</Label>
+                        <div className="grid grid-cols-4 gap-2">
+                          {COLORS.map((color) => (
+                            <button
+                              key={color}
+                              onClick={() => setFormData({ ...formData, colorScheme: color })}
+                              style={{ backgroundColor: color }}
+                              className={`w-full aspect-square rounded-full transition-all ${
+                                formData.colorScheme === color ? 'ring-2 ring-offset-2 ring-primary scale-90' : 'hover:scale-105'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Photo Upload / Drag-n-Drop */}
+                      <div className="space-y-2">
+                        <Label className="text-sm text-muted-foreground">Background Photo</Label>
+                        <div
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            setIsDragging(false);
+                            const file = e.dataTransfer.files[0];
+                            if (file) handleFile(file);
+                          }}
+                          className={`h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden relative ${
+                            isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                          }`}
+                          onClick={() => document.getElementById('fileInput')?.click()}
+                        >
+                          {formData.bgImage ? (
+                            <img src={formData.bgImage} className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                          ) : (
+                            <>
+                              <ImageIcon className="text-muted-foreground mb-1" size={20} />
+                              <span className="text-[10px] text-muted-foreground text-center px-2">Drag photo or click to upload</span>
+                            </>
+                          )}
+                          <input 
+                            id="fileInput"
+                            type="file"
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleFile(file);
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -276,21 +363,20 @@ export default function CreateGift() {
                     <p className="text-muted-foreground">Review your gift before paying.</p>
                   </div>
 
-                  <div className={`p-8 rounded-2xl relative overflow-hidden ${THEMES.find(t => t.id === formData.theme)?.colorClass}`}>
+                  <div className={`p-8 rounded-2xl relative overflow-hidden`} style={{ backgroundColor: formData.colorScheme }}>
+                    {formData.bgImage && (
+                      <div className="absolute inset-0 bg-cover bg-center opacity-40" style={{ backgroundImage: `url(${formData.bgImage})` }} />
+                    )}
                     <div className="relative z-10 bg-white/90 backdrop-blur-md p-6 rounded-xl shadow-sm text-center space-y-4 border border-white/50">
                       <p className="text-sm font-bold tracking-widest text-muted-foreground uppercase">You are sending</p>
                       <div className="text-5xl font-display font-bold text-foreground">
-                        ${formData.amount} <span className="text-2xl text-muted-foreground">USDC</span>
+                        {formData.tokenType === 'USDC' ? `$${formData.amount}` : formData.nftId || 'NFT'} 
+                        <span className="text-2xl text-muted-foreground ml-2">{formData.tokenType}</span>
                       </div>
                       <div className="h-px bg-border w-1/2 mx-auto my-4" />
                       <p className="font-handwriting text-2xl text-foreground/80 leading-relaxed">"{formData.message}"</p>
                       <p className="text-sm font-bold text-muted-foreground mt-4">- {formData.senderName || 'A friend'}</p>
                     </div>
-                  </div>
-
-                  <div className="bg-muted/50 p-4 rounded-xl flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Network Fee (Base)</span>
-                    <span className="font-mono font-bold">~$0.05</span>
                   </div>
                 </div>
               )}
@@ -319,7 +405,7 @@ export default function CreateGift() {
                       </>
                     ) : (
                       <>
-                        Pay & Create Link <Send className="ml-2 h-5 w-5" />
+                        Create Link <Send className="ml-2 h-5 w-5" />
                       </>
                     )}
                   </Button>
