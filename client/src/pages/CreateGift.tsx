@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Coins, Image as ImageIcon, Sparkles, Send, Loader2, ArrowLeft } from "lucide-react";
+import { Coins, Image as ImageIcon, Sparkles, Send, Loader2, ArrowLeft, Heart, PartyPopper, Leaf } from "lucide-react";
 import { ThemeCard } from "@/components/ThemeCard";
 import { useCreateGift } from "@/hooks/use-gifts";
 import { useWallet } from "@/hooks/use-wallet";
@@ -27,22 +27,30 @@ const THEMES = [
 
 // iOS-style Stickers
 const STICKERS = [
-  { id: 'cake', emoji: '🎂' },
-  { id: 'party', emoji: '🥳' },
-  { id: 'heart', emoji: '❤️' },
-  { id: 'star', emoji: '⭐' },
-  { id: 'coffee', emoji: '☕' },
-  { id: 'gift', emoji: '🎁' },
-  { id: 'balloon', emoji: '🎈' },
-  { id: 'champagne', emoji: '🥂' },
-  { id: 'flower', emoji: '🌸' },
-  { id: 'rocket', emoji: '🚀' },
-  { id: 'gem', emoji: '💎' },
-  { id: 'fire', emoji: '🔥' },
+  { id: 'cake', emoji: '🎂', category: 'celebration' },
+  { id: 'party', emoji: '🥳', category: 'celebration' },
+  { id: 'heart', emoji: '❤️', category: 'love' },
+  { id: 'star', emoji: '⭐', category: 'nature' },
+  { id: 'coffee', emoji: '☕', category: 'celebration' },
+  { id: 'gift', emoji: '🎁', category: 'celebration' },
+  { id: 'balloon', emoji: '🎈', category: 'celebration' },
+  { id: 'champagne', emoji: '🥂', category: 'celebration' },
+  { id: 'flower', emoji: '🌸', category: 'love' },
+  { id: 'rocket', emoji: '🚀', category: 'nature' },
+  { id: 'gem', emoji: '💎', category: 'nature' },
+  { id: 'fire', emoji: '🔥', category: 'nature' },
+];
+
+const STICKER_CATEGORIES = [
+  { id: 'all', label: 'All', icon: Sparkles },
+  { id: 'celebration', label: 'Party', icon: PartyPopper },
+  { id: 'love', label: 'Love', icon: Heart },
+  { id: 'nature', label: 'Nature', icon: Leaf },
 ];
 
 const COLORS = [
-  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#71717a'
+  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#71717a',
+  '#000000', '#ffffff', '#fbbf24', '#a78bfa', '#fb7185', '#2dd4bf', '#818cf8', '#f472b6'
 ];
 
 export default function CreateGift() {
@@ -66,6 +74,11 @@ export default function CreateGift() {
   });
 
   const [isDragging, setIsDragging] = useState(false);
+  const [stickerCategory, setStickerCategory] = useState('all');
+
+  const filteredStickers = stickerCategory === 'all' 
+    ? STICKERS 
+    : STICKERS.filter(s => s.category === stickerCategory);
 
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -239,21 +252,42 @@ export default function CreateGift() {
                   <div className="space-y-4">
                     <Label className="text-lg">Style & Decorations</Label>
                     
-                    {/* iOS Style Sticker Picker */}
-                    <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Sticker</Label>
-                      <div className="flex gap-3 overflow-x-auto py-6 scrollbar-hide px-1">
-                        {STICKERS.map((s) => (
-                          <button
-                            key={s.id}
-                            onClick={() => setFormData({ ...formData, sticker: s.id })}
-                            className={`flex-shrink-0 w-12 h-12 flex items-center justify-center text-2xl rounded-full transition-all ${
-                              formData.sticker === s.id ? 'bg-primary/20 scale-110 ring-2 ring-primary' : 'bg-muted hover:bg-muted/80'
-                            }`}
-                          >
-                            {s.emoji}
-                          </button>
-                        ))}
+                    {/* iOS Style Sticker Picker with Sidebar */}
+                    <div className="space-y-4">
+                      <Label className="text-sm text-muted-foreground">Stickers</Label>
+                      <div className="flex gap-4 h-48 border rounded-2xl overflow-hidden bg-muted/10">
+                        {/* Sidebar */}
+                        <div className="w-16 border-r bg-muted/20 flex flex-col items-center py-4 gap-4 overflow-y-auto scrollbar-hide">
+                          {STICKER_CATEGORIES.map((cat) => (
+                            <button
+                              key={cat.id}
+                              onClick={() => setStickerCategory(cat.id)}
+                              className={`p-2 rounded-xl transition-all ${
+                                stickerCategory === cat.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'
+                              }`}
+                              title={cat.label}
+                            >
+                              <cat.icon size={20} />
+                            </button>
+                          ))}
+                        </div>
+                        
+                        {/* Sticker Grid */}
+                        <div className="flex-1 overflow-x-auto py-6 scrollbar-hide px-4">
+                          <div className="flex gap-3 h-full items-center">
+                            {filteredStickers.map((s) => (
+                              <button
+                                key={s.id}
+                                onClick={() => setFormData({ ...formData, sticker: s.id })}
+                                className={`flex-shrink-0 w-14 h-14 flex items-center justify-center text-3xl rounded-2xl transition-all ${
+                                  formData.sticker === s.id ? 'bg-primary/20 scale-110 ring-2 ring-primary' : 'bg-white hover:bg-muted/80 shadow-sm'
+                                }`}
+                              >
+                                {s.emoji}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -261,13 +295,13 @@ export default function CreateGift() {
                       {/* Color Palette */}
                       <div className="space-y-2">
                         <Label className="text-sm text-muted-foreground">Theme Color</Label>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="flex gap-2 overflow-x-auto pb-4 pt-2 scrollbar-hide">
                           {COLORS.map((color) => (
                             <button
                               key={color}
                               onClick={() => setFormData({ ...formData, colorScheme: color })}
                               style={{ backgroundColor: color }}
-                              className={`w-full aspect-square rounded-full transition-all ${
+                              className={`flex-shrink-0 w-10 h-10 rounded-full transition-all ${
                                 formData.colorScheme === color ? 'ring-2 ring-offset-2 ring-primary scale-90' : 'hover:scale-105'
                               }`}
                             />
