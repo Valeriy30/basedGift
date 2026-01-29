@@ -1,52 +1,48 @@
-import { useState, useEffect } from 'react';
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-
-interface WalletState {
-  address: string | null;
-  isConnected: boolean;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-}
-
-// Simple mock wallet store using Zustand
-export const useWalletStore = create<WalletState>()(
-  persist(
-    (set) => ({
-      address: null,
-      isConnected: false,
-      connect: async () => {
-        // Simulate connection delay
-        await new Promise((resolve) => setTimeout(resolve, 800));
-        // Generate a random mock address
-        const mockAddress = `0x71C...${Math.random().toString(16).slice(2, 6)}`;
-        set({ address: mockAddress, isConnected: true });
-      },
-      disconnect: () => set({ address: null, isConnected: false }),
-    }),
-    {
-      name: 'wallet-storage',
-    }
-  )
-);
+import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
+import { baseSepolia, base } from 'wagmi/chains';
+import { USDC_ADDRESS, BASE_CHAIN_ID } from '@/lib/wagmi';
 
 export function useWallet() {
-  // Hydration fix for Next.js/SSR environments (though we are SPA, good practice)
-  const [mounted, setMounted] = useState(false);
-  const store = useWalletStore();
+  const { address, isConnected, chain } = useAccount();
+  const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // Получаем баланс ETH
+  const { data: ethBalance } = useBalance({
+    address,
+    chainId: BASE_CHAIN_ID,
+  });
 
-  if (!mounted) {
-    return {
-      address: null,
-      isConnected: false,
-      connect: async () => {},
-      disconnect: () => {},
-    };
-  }
+  // Получаем баланс USDC
+  const { data: usdcBalance } = useBalance({
+    address,
+    token: USDC_ADDRESS[BASE_CHAIN_ID],
+    chainId: BASE_CHAIN_ID,
+  });
 
-  return store;
+  // Функция для подключения кошелька
+  const connectWallet = async () => {
+    try {
+      // Пробуем подключиться через injected connector (MetaMask, Coinbase Wallet и т.д.)
+      const injectedConnector = connectors.find((c) => c.id === 'injected');
+      if (injectedConnector) {
+        connect({ connector: injectedConnector, chainId: BASE_CHAIN_ID });
+      } else if (connectors[0]) {
+        // Если нет injected, используем первый доступный (обычно WalletConnect)
+        connect({ connector: connectors[0], chainId: BASE_CHAIN_ID });
+      }
+    } catch (error) {
+      console.error('Failed to connect wallet:', error);
+    }
+  };
+
+  return {
+    address,
+    isConnected,
+    connect: connectWallet,
+    disconnect,
+    chain,
+    ethBalance,
+    usdcBalance,
+  };
 }

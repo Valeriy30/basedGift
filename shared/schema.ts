@@ -11,8 +11,9 @@ export const gifts = pgTable("gifts", {
   tokenId: text("token_id"), // For NFTs
   amount: text("amount"), // String to handle high precision
   message: text("message"),
-  theme: text("theme").notNull().default('default'), // 'birthday', 'coffee', 'thanks', 'just_because'
-  visualAssets: jsonb("visual_assets"), // Store stickers, bg settings as JSON
+  colorStart: text("color_start").notNull().default('#4F46E5'), // HEX левого цвета
+  colorEnd: text("color_end").notNull().default('#EC4899'),     // HEX правого цвета
+  emoji: text("emoji").notNull().default('🎁'),  visualAssets: jsonb("visual_assets"), // Store stickers, bg settings as JSON
   status: text("status").notNull().default('created'), // 'created', 'claimed'
   escrowTxHash: text("escrow_tx_hash"), // Transaction hash of the deposit
   claimTxHash: text("claim_tx_hash"), // Transaction hash of the claim

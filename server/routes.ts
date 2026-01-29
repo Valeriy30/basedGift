@@ -34,7 +34,8 @@ export async function registerRoutes(
   });
 
   app.get(api.gifts.get.path, async (req, res) => {
-    const gift = await storage.getGift(req.params.id);
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const gift = await storage.getGift(id);
     if (!gift) {
       return res.status(404).json({ message: 'Gift not found' });
     }
@@ -43,8 +44,9 @@ export async function registerRoutes(
 
   app.patch(api.gifts.claim.path, async (req, res) => {
     try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const input = api.gifts.claim.input.parse(req.body);
-      const gift = await storage.updateGiftStatus(req.params.id, input);
+      const gift = await storage.updateGiftStatus(id, input);
       
       if (!gift) {
         return res.status(404).json({ message: 'Gift not found' });
@@ -82,7 +84,6 @@ async function seedDatabase() {
       senderAddress: "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
       tokenType: "USDC",
       amount: "10",
-      theme: "birthday",
       message: "Happy Birthday! Have a coffee on me.",
       status: "created",
       visualAssets: { sticker: "cake" },

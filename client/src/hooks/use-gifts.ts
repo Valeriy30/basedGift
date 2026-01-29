@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api, buildUrl } from "@shared/routes";
 import { type InsertGift, type Gift } from "@shared/schema";
-
-// Simulating a delay for "blockchain" interactions
-const simulateDelay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+import { useTransferUSDC } from "./use-usdc";
+import { useTransferNFT } from "./use-nft";
 
 // GET /api/gifts/:id
 export function useGift(id: string) {
@@ -30,9 +29,9 @@ export function useCreateGift() {
   
   return useMutation({
     mutationFn: async (data: InsertGift) => {
-      // Simulate wallet signing delay
-      await simulateDelay(1500);
-
+      // Для USDC и NFT транзакции будут выполняться на стороне клиента
+      // при клейме подарка. Здесь просто сохраняем информацию о подарке.
+      
       const res = await fetch(api.gifts.create.path, {
         method: api.gifts.create.method,
         headers: { 'Content-Type': 'application/json' },
@@ -51,24 +50,27 @@ export function useCreateGift() {
     },
     onSuccess: (newGift) => {
       // Pre-seed the cache for this gift so immediate navigation works smoothly
-      const url = buildUrl(api.gifts.get.path, { id: newGift.id });
       queryClient.setQueryData([api.gifts.get.path, newGift.id], newGift);
     },
   });
 }
 
 // PATCH /api/gifts/:id/claim
+// Этот хук теперь только обновляет статус в базе данных
+// Реальная транзакция выполняется в компоненте ClaimGift
 export function useClaimGift() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, receiverAddress }: { id: string; receiverAddress: string }) => {
-      // Simulate blockchain transaction delay
-      await simulateDelay(2000);
-
-      // Create a fake transaction hash
-      const mockTxHash = `0x${Math.random().toString(16).slice(2)}...`;
-
+    mutationFn: async ({ 
+      id, 
+      receiverAddress, 
+      claimTxHash 
+    }: { 
+      id: string; 
+      receiverAddress: string;
+      claimTxHash?: string;
+    }) => {
       const url = buildUrl(api.gifts.claim.path, { id });
       const res = await fetch(url, {
         method: api.gifts.claim.method,
@@ -76,7 +78,7 @@ export function useClaimGift() {
         body: JSON.stringify({
           status: 'claimed',
           receiverAddress,
-          claimTxHash: mockTxHash,
+          claimTxHash: claimTxHash || 'pending',
         }),
       });
 
@@ -87,7 +89,6 @@ export function useClaimGift() {
       return api.gifts.claim.responses[200].parse(await res.json());
     },
     onSuccess: (updatedGift) => {
-      const url = buildUrl(api.gifts.get.path, { id: updatedGift.id });
       queryClient.invalidateQueries({ queryKey: [api.gifts.get.path, updatedGift.id] });
     },
   });

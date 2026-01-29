@@ -11,8 +11,12 @@ import { Coins, Image as ImageIcon, Sparkles, Send, Loader2, ArrowLeft } from "l
 import { ThemeCard } from "@/components/ThemeCard";
 import { useCreateGift } from "@/hooks/use-gifts";
 import { useWallet } from "@/hooks/use-wallet";
+import { useUSDCBalance } from "@/hooks/use-usdc";
 import { useToast } from "@/hooks/use-toast";
 import { nanoid } from "nanoid";
+import { useCreateUSDCGift } from '@/hooks/use-escrow'; // Новый хук
+import { useApproveUSDC } from '@/hooks/use-usdc';     // Убедись, что он есть
+import { ESCROW_CONTRACT_ADDRESS, BASE_CHAIN_ID } from '@/lib/wagmi'; // Адреса
 
 // Steps definition
 const STEPS = ["Asset", "Customize", "Review"];
@@ -25,31 +29,99 @@ const THEMES = [
   { id: 'just_because', name: 'Just Because', description: 'Surprise them for no reason.', colorClass: 'theme-just_because' },
 ];
 
-// iOS-style Stickers
+// Расширенная коллекция стикеров (эмодзи доступные на всех устройствах)
 const STICKERS = [
+  // Праздники и празднование
   { id: 'cake', emoji: '🎂' },
   { id: 'party', emoji: '🥳' },
-  { id: 'heart', emoji: '❤️' },
-  { id: 'star', emoji: '⭐' },
-  { id: 'coffee', emoji: '☕' },
-  { id: 'gift', emoji: '🎁' },
   { id: 'balloon', emoji: '🎈' },
   { id: 'champagne', emoji: '🥂' },
+  { id: 'confetti', emoji: '🎉' },
+  { id: 'sparkler', emoji: '🎇' },
+  { id: 'fireworks', emoji: '🎆' },
+  
+  // Подарки и награды
+  { id: 'gift', emoji: '🎁' },
+  { id: 'wrapped_gift', emoji: '🎀' },
+  { id: 'trophy', emoji: '🏆' },
+  { id: 'medal', emoji: '🏅' },
+  { id: 'ribbon', emoji: '🎗️' },
+  
+  // Любовь и дружба
+  { id: 'heart', emoji: '❤️' },
+  { id: 'heart_eyes', emoji: '😍' },
+  { id: 'sparkling_heart', emoji: '💖' },
+  { id: 'two_hearts', emoji: '💕' },
+  { id: 'hug', emoji: '🤗' },
+  { id: 'kiss', emoji: '😘' },
+  
+  // Еда и напитки
+  { id: 'coffee', emoji: '☕' },
+  { id: 'pizza', emoji: '🍕' },
+  { id: 'burger', emoji: '🍔' },
+  { id: 'ice_cream', emoji: '🍦' },
+  { id: 'donut', emoji: '🍩' },
+  { id: 'cocktail', emoji: '🍹' },
+  
+  // Природа
   { id: 'flower', emoji: '🌸' },
+  { id: 'rose', emoji: '🌹' },
+  { id: 'sunflower', emoji: '🌻' },
+  { id: 'rainbow', emoji: '🌈' },
+  { id: 'sun', emoji: '☀️' },
+  { id: 'star', emoji: '⭐' },
+  
+  // Активности
   { id: 'rocket', emoji: '🚀' },
+  { id: 'airplane', emoji: '✈️' },
+  { id: 'car', emoji: '🚗' },
+  { id: 'beach', emoji: '🏖️' },
+  { id: 'music', emoji: '🎵' },
+  { id: 'guitar', emoji: '🎸' },
+  
+  // Драгоценности и деньги
   { id: 'gem', emoji: '💎' },
+  { id: 'money', emoji: '💰' },
+  { id: 'dollar', emoji: '💵' },
+  { id: 'coin', emoji: '🪙' },
+  
+  // Другое
   { id: 'fire', emoji: '🔥' },
+  { id: 'sparkles', emoji: '✨' },
+  { id: 'crown', emoji: '👑' },
+  { id: 'clap', emoji: '👏' },
+  { id: 'thumb_up', emoji: '👍' },
+  { id: 'ok_hand', emoji: '👌' },
 ];
 
+// Палитра цветов для градиента
 const COLORS = [
-  '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#71717a'
+  '#ef4444', // Red
+  '#f97316', // Orange  
+  '#f59e0b', // Amber
+  '#eab308', // Yellow
+  '#84cc16', // Lime
+  '#10b981', // Green
+  '#14b8a6', // Teal
+  '#06b6d4', // Cyan
+  '#0ea5e9', // Sky
+  '#3b82f6', // Blue
+  '#6366f1', // Indigo
+  '#8b5cf6', // Violet
+  '#a855f7', // Purple
+  '#d946ef', // Fuchsia
+  '#ec4899', // Pink
+  '#f43f5e', // Rose
 ];
 
 export default function CreateGift() {
   const [step, setStep] = useState(0);
   const [, setLocation] = useLocation();
-  const { address } = useWallet();
+  const { address, isConnected } = useWallet();
+  const { balance: usdcBalance } = useUSDCBalance();
   const { toast } = useToast();
+  const { approve, isPending: isApproving } = useApproveUSDC();
+  const { createGift: createGiftOnChain, isPending: isContractLoading } = useCreateUSDCGift();
   const createGift = useCreateGift();
 
   // Form State
@@ -62,6 +134,7 @@ export default function CreateGift() {
     bgImage: '',
     sticker: '',
     colorScheme: '#3b82f6',
+    colorScheme2: '#8b5cf6', // Второй цвет для градиента
     nftId: '',
   });
 
@@ -96,29 +169,37 @@ export default function CreateGift() {
   const handleSubmit = async () => {
     try {
       if (!address) throw new Error("Wallet not connected");
-
+      const newGiftId = nanoid();
+  
+      
+      toast({ title: "Step 1/2", description: "Approving USDC..." });
+     
+      const approveHash = await approve(ESCROW_CONTRACT_ADDRESS[BASE_CHAIN_ID], formData.amount);
+      toast({ title: "Step 2/2", description: "Creating gift on-chain..." });
+      await createGiftOnChain(newGiftId, formData.amount);
       const newGift = await createGift.mutateAsync({
-        id: nanoid(),
+        id: newGiftId,
         senderAddress: address,
         tokenType: formData.tokenType,
         amount: formData.amount,
         message: formData.message,
-        theme: formData.theme,
-        visualAssets: { 
-          senderName: formData.senderName,
+        visualAssets: { senderName: formData.senderName,
           bgImage: formData.bgImage,
           sticker: formData.sticker,
-          colorScheme: formData.colorScheme
-        },
+          colorScheme: formData.colorScheme,
+          colorScheme2: formData.colorScheme2},
         status: 'created'
       });
-
-      toast({ title: "Gift Created!", description: "Your gift link is ready to share." });
+  
+      toast({ title: "Success!", description: "Gift ready to share!" });
       setLocation(`/share/${newGift.id}`);
-    } catch (error) {
+  
+    } catch (error: any) {
+      console.error('Full error:', error);
+      // Если пользователь отклонил транзакцию или нет газа — база данных не обновится. Это правильно!
       toast({ 
-        title: "Error", 
-        description: error instanceof Error ? error.message : "Something went wrong", 
+        title: "Transaction Failed", 
+        description: error?.shortMessage || error?.message || "Something went wrong", 
         variant: "destructive" 
       });
     }
@@ -208,7 +289,9 @@ export default function CreateGift() {
                           onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                         />
                       </div>
-                      <p className="text-sm text-muted-foreground">Balance: $1,240.50 USDC</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isConnected ? `Balance: $${parseFloat(usdcBalance).toFixed(2)} USDC` : 'Connect wallet to see balance'}
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-3 pt-4">
@@ -257,21 +340,53 @@ export default function CreateGift() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Color Palette */}
-                      <div className="space-y-2">
-                        <Label className="text-sm text-muted-foreground">Theme Color</Label>
-                        <div className="grid grid-cols-4 gap-2">
-                          {COLORS.map((color) => (
-                            <button
-                              key={color}
-                              onClick={() => setFormData({ ...formData, colorScheme: color })}
-                              style={{ backgroundColor: color }}
-                              className={`w-full aspect-square rounded-full transition-all ${
-                                formData.colorScheme === color ? 'ring-2 ring-offset-2 ring-primary scale-90' : 'hover:scale-105'
-                              }`}
-                            />
-                          ))}
+                    <div className="grid grid-cols-1 gap-6">
+                      {/* Gradient Color Picker */}
+                      <div className="space-y-3">
+                        <Label className="text-sm text-muted-foreground">Gradient Colors</Label>
+                        
+                        {/* Превью градиента */}
+                        <div 
+                          className="h-20 rounded-xl border-2 border-border/50"
+                          style={{
+                            background: `linear-gradient(135deg, ${formData.colorScheme} 0%, ${formData.colorScheme2} 100%)`
+                          }}
+                        />
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          {/* Первый цвет */}
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Color 1</Label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {COLORS.map((color) => (
+                                <button
+                                  key={color}
+                                  onClick={() => setFormData({ ...formData, colorScheme: color })}
+                                  style={{ backgroundColor: color }}
+                                  className={`w-full aspect-square rounded-full transition-all ${
+                                    formData.colorScheme === color ? 'ring-2 ring-offset-1 ring-primary scale-90' : 'hover:scale-105'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          
+                          {/* Второй цвет */}
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground">Color 2</Label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {COLORS.map((color) => (
+                                <button
+                                  key={color}
+                                  onClick={() => setFormData({ ...formData, colorScheme2: color })}
+                                  style={{ backgroundColor: color }}
+                                  className={`w-full aspect-square rounded-full transition-all ${
+                                    formData.colorScheme2 === color ? 'ring-2 ring-offset-1 ring-primary scale-90' : 'hover:scale-105'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -349,7 +464,12 @@ export default function CreateGift() {
                     <p className="text-muted-foreground">Review your gift before paying.</p>
                   </div>
 
-                  <div className={`p-8 rounded-2xl relative overflow-hidden`} style={{ backgroundColor: formData.colorScheme }}>
+                  <div 
+                    className={`p-8 rounded-2xl relative overflow-hidden`} 
+                    style={{ 
+                      background: `linear-gradient(135deg, ${formData.colorScheme} 0%, ${formData.colorScheme2} 100%)`
+                    }}
+                  >
                     {formData.bgImage && (
                       <div className="absolute inset-0 bg-cover bg-center opacity-40" style={{ backgroundImage: `url(${formData.bgImage})` }} />
                     )}
@@ -381,20 +501,28 @@ export default function CreateGift() {
                   </Button>
                 ) : (
                   <Button 
-                    onClick={handleSubmit} 
-                    disabled={createGift.isPending}
-                    className="rounded-xl px-8 h-12 text-lg shadow-lg shadow-primary/20 bg-gradient-to-r from-primary to-blue-600 hover:to-blue-700"
-                  >
-                    {createGift.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Wrappping Gift...
-                      </>
-                    ) : (
-                      <>
-                        Create Link <Send className="ml-2 h-5 w-5" />
-                      </>
-                    )}
-                  </Button>
+  onClick={handleSubmit} 
+  disabled={isApproving || isContractLoading || createGift.isPending}
+  className="rounded-xl px-8 h-12 text-lg shadow-lg shadow-primary/20 bg-gradient-to-r from-primary to-blue-600 hover:to-blue-700"
+>
+  {isApproving ? (
+    <>
+      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Approving USDC...
+    </>
+  ) : isContractLoading ? (
+    <>
+      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Creating on Chain...
+    </>
+  ) : createGift.isPending ? (
+    <>
+      <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Saving...
+    </>
+  ) : (
+    <>
+      Create Link <Send className="ml-2 h-5 w-5" />
+    </>
+  )}
+</Button>
                 )}
               </div>
             </Card>

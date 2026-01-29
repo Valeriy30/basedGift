@@ -35,7 +35,7 @@ export function Navbar() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 rounded-xl">
-                  <DropdownMenuItem onClick={disconnect} className="text-destructive cursor-pointer">
+                  <DropdownMenuItem onClick={() => disconnect()} className="text-destructive cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
                     Disconnect
                   </DropdownMenuItem>

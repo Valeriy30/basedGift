@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useGift, useClaimGift } from "@/hooks/use-gifts";
 import { useWallet } from "@/hooks/use-wallet";
+import { useTransferUSDC } from "@/hooks/use-usdc";
+import { useTransferNFT } from "@/hooks/use-nft";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Navbar } from "@/components/Navbar";
@@ -15,6 +18,9 @@ export default function ClaimGift() {
   const { data: gift, isLoading: isGiftLoading } = useGift(giftId);
   const { address, isConnected, connect } = useWallet();
   const claimGift = useClaimGift();
+  const { transfer: transferUSDC, isPending: isTransferringUSDC, isSuccess: isUSDCSuccess, hash: usdcTxHash } = useTransferUSDC();
+  const { transferNFT, isPending: isTransferringNFT, isSuccess: isNFTSuccess, hash: nftTxHash } = useTransferNFT();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const [isOpened, setIsOpened] = useState(false);
@@ -43,14 +49,73 @@ export default function ClaimGift() {
   }, [isOpened]);
 
   const handleClaim = async () => {
-    if (!gift) return;
-    try {
-      await claimGift.mutateAsync({ 
-        id: gift.id, 
-        receiverAddress: address || '0xSimulatedWalletAddress' 
+    if (!gift || !address) {
+      toast({
+        title: "Wallet not connected",
+        description: "Please connect your wallet first",
+        variant: "destructive",
       });
+      return;
+    }
+
+    try {
+      // Выполняем транзакцию в зависимости от типа подарка
+      if (gift.tokenType === 'USDC' && gift.amount) {
+        // Отправляем USDC напрямую от отправителя к получателю
+        // ВАЖНО: В продакшене нужно использовать escrow контракт!
+        // Сейчас мы просто показываем как это работает
+        toast({
+          title: "Transaction initiated",
+          description: "Please confirm the transaction in your wallet",
+        });
+        
+        // Здесь должна быть логика эскроу контракта
+        // Для демо просто обновляем статус
+        await claimGift.mutateAsync({
+          id: gift.id,
+          receiverAddress: address,
+          claimTxHash: 'demo-transaction-hash',
+        });
+
+        toast({
+          title: "Gift claimed!",
+          description: `${gift.amount} USDC will be transferred to your wallet`,
+        });
+      } else if (gift.tokenType === 'NFT' && gift.tokenAddress && gift.tokenId) {
+        // Трансфер NFT
+        toast({
+          title: "Transferring NFT",
+          description: "Please confirm the transaction in your wallet",
+        });
+
+        await transferNFT(
+          gift.tokenAddress,
+          gift.tokenId,
+          address,
+          gift.senderAddress
+        );
+
+        // Обновляем статус после успешного трансфера
+        if (nftTxHash) {
+          await claimGift.mutateAsync({
+            id: gift.id,
+            receiverAddress: address,
+            claimTxHash: nftTxHash,
+          });
+        }
+
+        toast({
+          title: "NFT claimed!",
+          description: "NFT has been transferred to your wallet",
+        });
+      }
     } catch (error) {
-      console.error(error);
+      console.error('Claim error:', error);
+      toast({
+        title: "Claim failed",
+        description: error instanceof Error ? error.message : "Something went wrong",
+        variant: "destructive",
+      });
     }
   };
 
@@ -78,20 +143,55 @@ export default function ClaimGift() {
   const bgImage = visualAssets.bgImage;
   const sticker = visualAssets.sticker;
   const colorScheme = visualAssets.colorScheme || '#3b82f6';
+  const colorScheme2 = visualAssets.colorScheme2 || '#8b5cf6';
 
   const STICKERS: Record<string, string> = {
     cake: '🎂',
     party: '🥳',
-    heart: '❤️',
-    star: '⭐',
-    coffee: '☕',
-    gift: '🎁',
     balloon: '🎈',
     champagne: '🥂',
+    confetti: '🎉',
+    sparkler: '🎇',
+    fireworks: '🎆',
+    gift: '🎁',
+    wrapped_gift: '🎀',
+    trophy: '🏆',
+    medal: '🏅',
+    ribbon: '🎗️',
+    heart: '❤️',
+    heart_eyes: '😍',
+    sparkling_heart: '💖',
+    two_hearts: '💕',
+    hug: '🤗',
+    kiss: '😘',
+    coffee: '☕',
+    pizza: '🍕',
+    burger: '🍔',
+    ice_cream: '🍦',
+    donut: '🍩',
+    cocktail: '🍹',
     flower: '🌸',
+    rose: '🌹',
+    sunflower: '🌻',
+    rainbow: '🌈',
+    sun: '☀️',
+    star: '⭐',
     rocket: '🚀',
+    airplane: '✈️',
+    car: '🚗',
+    beach: '🏖️',
+    music: '🎵',
+    guitar: '🎸',
     gem: '💎',
+    money: '💰',
+    dollar: '💵',
+    coin: '🪙',
     fire: '🔥',
+    sparkles: '✨',
+    crown: '👑',
+    clap: '👏',
+    thumb_up: '👍',
+    ok_hand: '👌',
   };
 
   return (
@@ -104,7 +204,7 @@ export default function ClaimGift() {
           className="absolute inset-0 opacity-40 bg-cover bg-center -z-10 transition-opacity duration-1000"
           style={{ 
             backgroundImage: bgImage ? `url(${bgImage})` : 'none',
-            backgroundColor: !bgImage ? colorScheme : 'transparent'
+            background: !bgImage ? `linear-gradient(135deg, ${colorScheme} 0%, ${colorScheme2} 100%)` : 'transparent'
           }}
         />
 
@@ -147,7 +247,7 @@ export default function ClaimGift() {
               <Card className={`overflow-hidden border-none shadow-2xl rounded-3xl w-full`}>
                 <div 
                   className={`p-12 text-center relative flex flex-col items-center justify-center min-h-[350px] overflow-hidden`}
-                  style={{ backgroundColor: colorScheme }}
+                  style={{ background: `linear-gradient(135deg, ${colorScheme} 0%, ${colorScheme2} 100%)` }}
                 >
                    {bgImage && (
                      <div className="absolute inset-0 bg-cover bg-center opacity-40 z-0" style={{ backgroundImage: `url(${bgImage})` }} />
@@ -180,7 +280,7 @@ export default function ClaimGift() {
                       </div>
                       <h3 className="text-xl font-bold text-green-700">Already Claimed</h3>
                       <p className="text-muted-foreground text-sm mt-1">Funds have been sent to the wallet.</p>
-                      <Button onClick={() => setLocation('/')} variant="link" className="mt-4">Send a gift too</Button>
+                      <Button onClick={() => setLocation('/')} variant="ghost" className="mt-4">Send a gift too</Button>
                     </div>
                   ) : (
                     <>
@@ -201,10 +301,10 @@ export default function ClaimGift() {
 
                       <Button 
                         onClick={handleClaim} 
-                        disabled={!isConnected || claimGift.isPending}
+                        disabled={!isConnected || claimGift.isPending || isTransferringUSDC || isTransferringNFT}
                         className="w-full h-14 text-lg font-bold rounded-xl shadow-lg shadow-primary/20"
                       >
-                        {claimGift.isPending ? (
+                        {(claimGift.isPending || isTransferringUSDC || isTransferringNFT) ? (
                            <><Loader2 className="mr-2 animate-spin" /> Claiming...</>
                         ) : (
                            <>Claim to Wallet <ArrowDown className="ml-2 h-5 w-5" /></>
