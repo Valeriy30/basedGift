@@ -1,217 +1,126 @@
 # 🎁 basedGift
 
-Приложение для отправки цифровых подарков (USDC и NFT) в сети Base через уникальные ссылки.
+A beautiful platform for sending digital gifts (USDC, ETH, and NFTs) on the Base network through unique shareable links.
 
-## ✨ Особенности
+## ✨ Features
 
-- 🎨 **Красивый дизайн** с анимациями и градиентами
-- 💰 **Отправка USDC** напрямую на кошелек получателя
-- 🖼️ **Отправка NFT** с поддержкой ERC-721
-- 🎭 **Кастомизация** с 50+ стикерами и градиентными фонами
-- 🔗 **Простой UX** - просто отправьте ссылку
-- ⛓️ **Base Network** - быстрые и дешевые транзакции
+- 🎨 **Beautiful Design** with animations and gradients
+- 💰 **Send USDC & ETH** securely via smart contract escrow
+- 🖼️ **Send NFTs** with ERC-721 support
+- 🎭 **Rich Customization** with 50+ stickers, full color picker, and gradient backgrounds
+- 🔗 **Simple UX** - just share a link
+- ⛓️ **Base Network** - fast and cheap transactions
+- 🔒 **Smart Contract Escrow** - funds are locked until claimed
+- 🌐 **Multi-Network** - Base Mainnet and Base Sepolia testnet support
 
-## 🚀 Быстрый старт
+## 🚀 Quick Start
 
-### Предварительные требования
+### Prerequisites
 
 - Node.js 18+
-- PostgreSQL база данных (или Supabase)
-- WalletConnect Project ID ([получить здесь](https://cloud.walletconnect.com/))
+- PostgreSQL database (or Supabase)
+- WalletConnect Project ID ([get one here](https://cloud.walletconnect.com/))
+- Deployed GiftEscrow contract (see `contracts/GiftEscrow.sol`)
 
-### Установка
+### Installation
 
-1. **Клонируйте репозиторий**
+1. **Clone the repository**
 ```bash
 git clone <your-repo-url>
 cd basedGift
 ```
 
-2. **Установите зависимости**
+2. **Install dependencies**
 ```bash
 npm install
 ```
 
-3. **Настройте переменные окружения**
+3. **Configure environment variables**
 
-Создайте файл `.env` на основе `.env.example`:
+Create a `.env` file based on `.env.example`:
 ```bash
 cp .env.example .env
 ```
 
-Заполните переменные в `.env`:
+Fill in the variables in `.env`:
 ```env
 VITE_WALLETCONNECT_PROJECT_ID=your_project_id
 DATABASE_URL=postgresql://user:password@host:5432/database
 NODE_ENV=development
 ```
 
-4. **Настройте базу данных**
+4. **Set up database**
 ```bash
 npm run db:push
 ```
 
-5. **Запустите приложение**
+5. **Deploy the smart contract**
+
+Follow instructions in `contracts/` to deploy the GiftEscrow contract, then update the contract address in `client/src/lib/wagmi.ts`.
+
+6. **Run the application**
 ```bash
 npm run dev
 ```
 
-Приложение будет доступно по адресу `http://localhost:5000`
+The app will be available at `http://localhost:5000`
 
-## 🏗️ Архитектура
+## 🏗️ Architecture
 
-### Технологический стек
+### Tech Stack
 
 **Frontend:**
 - React 18 + TypeScript
-- Viem + Wagmi (Web3 интеграция)
-- Framer Motion (анимации)
-- Tailwind CSS + Radix UI (UI компоненты)
+- Viem + Wagmi (Web3 integration)
+- Framer Motion (animations)
+- Tailwind CSS + Radix UI (UI components)
 
 **Backend:**
 - Express.js
 - PostgreSQL + Drizzle ORM
-- Vite (сборка)
+- Vite (bundler)
 
 **Blockchain:**
-- Base (Layer 2 Ethereum)
-- USDC контракт: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
-- Поддержка Base Sepolia для тестирования
+- Base (Ethereum Layer 2)
+- USDC contract: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
+- Base Sepolia testnet support
+- GiftEscrow contract for secure fund locking
 
-## 📱 Использование
+## 📱 Usage
 
-### Создание подарка
+### Creating a Gift
 
-1. Нажмите "Create Gift"
-2. Подключите кошелек
-3. Выберите что отправить (USDC или NFT)
-4. Кастомизируйте оформление:
-   - Выберите 2 цвета для градиента
-   - Добавьте стикер
-   - Загрузите фоновое изображение
-   - Напишите сообщение
-5. Проверьте и создайте ссылку
+1. Click "Start Gifting"
+2. Connect your wallet
+3. Select what to send (USDC, ETH, or NFT)
+4. Customize the appearance:
+   - Choose 2 colors for the gradient (full color picker with RGB support)
+   - Add a sticker
+   - Upload a background image
+   - Write a message
+5. Review and create the link
+6. Share the link with the recipient
 
-### Получение подарка
+### Claiming a Gift
 
-1. Перейдите по ссылке
-2. Нажмите на подарок, чтобы открыть
-3. Подключите кошелек
-4. Нажмите "Claim to Wallet"
-5. Подтвердите транзакцию
+1. Open the gift link
+2. Click on the gift box to reveal
+3. Connect your wallet
+4. Click "Claim to Wallet"
+5. Confirm the transaction
+6. Funds/NFT will be transferred to your wallet
 
-## ⚠️ Важные замечания
+## 🔐 Security Features
 
-### Текущая реализация
+- ✅ **Smart Contract Escrow** - funds are locked until claimed
+- ✅ **On-chain validation** - checks gift status before claiming
+- ✅ **Race condition protection** - blockchain verification before database updates
+- ✅ **Private keys** never leave the user's wallet
+- ✅ **User confirmation** required for all transactions
+- ✅ **Input validation** - amount and address verification
+- ✅ `.env` files not committed to Git
 
-В текущей версии приложение использует **прямой трансфер** от отправителя к получателю. Это означает:
-
-- ❌ Средства НЕ хранятся в эскроу
-- ❌ Транзакция происходит только при клейме
-- ❌ Отправитель должен быть онлайн для трансфера
-
-### Рекомендации для продакшена
-
-Для полноценного продакшен приложения необходимо:
-
-1. **Создать Escrow контракт** для хранения средств
-2. **Реализовать механизм депозита** при создании подарка
-3. **Автоматический клейм** без участия отправителя
-4. **Интеграция с Base Account** для создания кошельков на лету
-5. **NFT API интеграция** (Alchemy, Moralis или SimpleHash)
-
-## 🔧 Следующие шаги для разработки
-
-### 1. Создание Escrow Smart Contract
-
-Создайте смарт-контракт для эскроу:
-
-```solidity
-// GiftEscrow.sol
-pragma solidity ^0.8.0;
-
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-
-contract GiftEscrow {
-    struct Gift {
-        address sender;
-        address token; // USDC или NFT контракт
-        uint256 amount; // Сумма или tokenId
-        bool isNFT;
-        bool claimed;
-    }
-    
-    mapping(bytes32 => Gift) public gifts;
-    
-    function createUSDCGift(bytes32 giftId, address token, uint256 amount) external {
-        // Депозит USDC в контракт
-    }
-    
-    function createNFTGift(bytes32 giftId, address nftContract, uint256 tokenId) external {
-        // Депозит NFT в контракт
-    }
-    
-    function claimGift(bytes32 giftId) external {
-        // Трансфер средств получателю
-    }
-}
-```
-
-### 2. Интеграция с Base Account
-
-Добавьте поддержку создания кошельков для новых пользователей:
-
-```typescript
-// Используйте Base Account API для создания кошельков
-// Документация: https://docs.base.org/base-account/
-```
-
-### 3. NFT Gallery
-
-Интегрируйте API для получения NFT пользователя:
-
-```typescript
-// Alchemy NFT API
-const alchemyApiKey = 'your-api-key';
-const baseUrl = `https://base-mainnet.g.alchemy.com/nft/v2/${alchemyApiKey}`;
-
-async function getUserNFTs(walletAddress: string) {
-  const response = await fetch(`${baseUrl}/getNFTs?owner=${walletAddress}`);
-  return response.json();
-}
-```
-
-## 📚 Структура проекта
-
-```
-basedGift/
-├── client/               # Frontend приложение
-│   ├── src/
-│   │   ├── components/  # UI компоненты
-│   │   ├── hooks/       # React hooks (wallet, usdc, nft)
-│   │   ├── lib/         # Конфигурация (wagmi)
-│   │   ├── pages/       # Страницы приложения
-│   │   └── App.tsx      # Главный компонент
-│   └── index.html
-├── server/              # Backend сервер
-│   ├── db.ts           # База данных
-│   ├── routes.ts       # API маршруты
-│   └── index.ts        # Express сервер
-├── shared/             # Общий код
-│   ├── schema.ts       # Схема базы данных
-│   └── routes.ts       # API типы
-└── package.json
-```
-
-## 🔐 Безопасность
-
-- ✅ Приватные ключи никогда не покидают кошелек пользователя
-- ✅ Все транзакции требуют подтверждения пользователя
-- ✅ `.env` файл не коммитится в Git
-- ⚠️ Для продакшена используйте escrow контракт
-
-## 🌐 Сети
+## 🌐 Networks
 
 ### Base Mainnet
 - Chain ID: `8453`
@@ -224,31 +133,104 @@ basedGift/
 - USDC: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
 - Faucet: https://www.coinbase.com/faucets/base-ethereum-goerli-faucet
 
-## 🛠️ Команды
+## 📚 Project Structure
+
+```
+basedGift/
+├── client/                      # Frontend application
+│   ├── src/
+│   │   ├── components/         # UI components
+│   │   │   ├── ColorPicker.tsx # Full RGB color picker
+│   │   │   ├── HowItWorks.tsx  # Feature walkthrough
+│   │   │   ├── NetworkSelector.tsx # Network switcher
+│   │   │   └── ...
+│   │   ├── hooks/              # React hooks
+│   │   │   ├── use-wallet.ts   # Wallet connection
+│   │   │   ├── use-usdc.ts     # USDC operations
+│   │   │   ├── use-escrow.ts   # Escrow contract interaction
+│   │   │   ├── use-nft.ts      # NFT operations
+│   │   │   └── ...
+│   │   ├── lib/                # Configuration
+│   │   │   └── wagmi.ts        # Web3 config
+│   │   ├── pages/              # Application pages
+│   │   │   ├── Landing.tsx     # Homepage
+│   │   │   ├── CreateGift.tsx  # Gift creation
+│   │   │   ├── ClaimGift.tsx   # Gift claiming
+│   │   │   └── ShareGift.tsx   # Share page
+│   │   └── App.tsx
+│   └── index.html
+├── server/                      # Backend server
+│   ├── db.ts                   # Database connection
+│   ├── routes.ts               # API routes
+│   └── index.ts                # Express server
+├── shared/                      # Shared code
+│   ├── schema.ts               # Database schema
+│   └── routes.ts               # API types
+├── contracts/                   # Smart contracts
+│   └── src/
+│       └── GiftEscrow.sol      # Main escrow contract
+├── TESTNET_REMOVAL_GUIDE.md    # Guide for production deployment
+└── package.json
+```
+
+## 🛠️ Commands
 
 ```bash
-# Разработка
-npm run dev          # Запустить dev сервер
+# Development
+npm run dev          # Start dev server
 
-# Сборка
-npm run build        # Собрать для продакшена
-npm run start        # Запустить продакшен сервер
+# Build
+npm run build        # Build for production
+npm run start        # Start production server
 
-# База данных
-npm run db:push      # Применить изменения схемы
+# Database
+npm run db:push      # Apply schema changes
 
-# Проверка типов
+# Type checking
 npm run check        # TypeScript type checking
 ```
 
-## 📝 Лицензия
+## 🔧 Configuration
+
+### Switching Networks
+
+The app supports both Base Mainnet and Base Sepolia. To switch:
+
+**For Development (Testnet):**
+- Set `TESTNET_MODE = true` in `client/src/lib/wagmi.ts`
+- Users can select between Base and Base Sepolia
+
+**For Production (Mainnet only):**
+- Set `TESTNET_MODE = false` in `client/src/lib/wagmi.ts`
+- See `TESTNET_REMOVAL_GUIDE.md` for detailed instructions
+
+### NFT API Integration
+
+To display user NFTs, integrate with:
+- [Alchemy NFT API](https://www.alchemy.com/)
+- [Moralis](https://moralis.io/)
+- [SimpleHash](https://simplehash.com/)
+
+Update `client/src/hooks/use-nft.ts` with your API key.
+
+## 📝 License
 
 MIT
 
-## 🤝 Вклад
+## 🤝 Contributing
 
-Pull requests приветствуются! Для больших изменений сначала откройте issue для обсуждения.
+Pull requests are welcome! For major changes, please open an issue first to discuss what you would like to change.
 
-## 📞 Поддержка
+## 📞 Support
 
-Если у вас есть вопросы или проблемы, создайте issue в репозитории.
+If you have questions or issues, please create an issue in the repository.
+
+## 🙏 Acknowledgments
+
+Built with ❤️ on Base
+
+---
+
+**For deployment instructions, see:**
+- `TESTNET_REMOVAL_GUIDE.md` - Switching to mainnet
+- `contracts/` - Smart contract deployment

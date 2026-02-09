@@ -8,6 +8,7 @@ import { Copy, CheckCircle, ExternalLink, Gift, ArrowRight } from "lucide-react"
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { truncateNFTName, getChainName, getChainIcon } from '@/lib/wagmi';
 
 export default function ShareGift() {
   const [, params] = useRoute("/share/:id");
@@ -16,7 +17,6 @@ export default function ShareGift() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  // In a real app, this would be the actual domain
   const shareLink = `${window.location.origin}/claim/${giftId}`;
 
   const handleCopy = () => {
@@ -29,11 +29,16 @@ export default function ShareGift() {
   if (isLoading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin text-primary">Loading...</div></div>;
   if (!gift) return <div className="min-h-screen flex items-center justify-center">Gift not found</div>;
 
+  const visualAssets = (gift.visualAssets as any) || {};
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
+      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
+      
       <Navbar />
 
-      <main className="flex-1 flex items-center justify-center p-4">
+      <main className="flex-1 flex items-center justify-center p-4 relative">
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -53,10 +58,24 @@ export default function ShareGift() {
             </div>
 
             <div>
-              <h1 className="text-3xl font-display font-bold mb-2">Gift Wrapped! 🎁</h1>
+              <h1 className="text-3xl font-display font-bold mb-2">Gift Wrapped!</h1>
               <p className="text-muted-foreground text-lg">
-                Your <span className="font-bold text-foreground">{gift.amount} USDC</span> gift is ready to be sent.
+                Your{' '}
+                <span className="font-bold text-foreground">
+                  {gift.tokenType === 'NFT' 
+                    ? truncateNFTName(visualAssets.nftName || 'NFT', 20)
+                    : gift.tokenType === 'ETH'
+                    ? `${gift.amount} ETH`
+                    : `${gift.amount} USDC`
+                  }
+                </span>{' '}
+                gift is ready to be sent.
               </p>
+              {gift.chainId && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  {getChainIcon(gift.chainId)} Created on {getChainName(gift.chainId)}
+                </p>
+              )}
             </div>
 
             <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 text-left space-y-3">

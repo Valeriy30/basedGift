@@ -5,20 +5,22 @@
 @tailwind utilities;
 
 :root {
-  /* Playful, vibrant Base/Coinbase inspired palette with a twist */
   --background: 210 20% 98%;
   --foreground: 222 47% 11%;
 
-  --primary: 221 83% 53%; /* Base Blue-ish */
+  --popover: 0 0% 100%; 
+  --popover-foreground: 222 47% 11%;
+
+  --primary: 221 83% 53%;
   --primary-foreground: 210 40% 98%;
 
-  --secondary: 255 92% 76%; /* Soft Pink/Purple for fun accents */
+  --secondary: 255 92% 76%;
   --secondary-foreground: 222 47% 11%;
 
   --muted: 210 40% 96%;
   --muted-foreground: 215 16% 47%;
 
-  --accent: 38 92% 50%; /* Golden/Orange for coins/value */
+  --accent: 38 92% 50%;
   --accent-foreground: 210 40% 98%;
 
   --destructive: 0 84% 60%;
@@ -30,7 +32,6 @@
 
   --radius: 1rem;
 
-  /* Font Variables */
   --font-display: 'Fredoka', sans-serif;
   --font-body: 'Nunito', sans-serif;
   --font-handwriting: 'Patrick Hand', cursive;
@@ -50,14 +51,12 @@
   }
 }
 
-/* Custom Animation Classes */
 .gift-card-hover {
   @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10;
 }
 
-/* Theme Specific Styles */
 .theme-birthday {
-  background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 99%, #FECFEF 100%);
+  background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%);
 }
 
 .theme-coffee {

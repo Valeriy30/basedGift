@@ -13,11 +13,15 @@ export async function registerRoutes(
   app.post(api.gifts.create.path, async (req, res) => {
     try {
       const input = api.gifts.create.input.parse(req.body);
-      // Ensure we have an ID. If the client sent one (e.g. predictable ID), use it, otherwise generate.
-      // The schema has `id` as text primary key.
+      const id = input.id || nanoid();
+      
       const giftData = {
         ...input,
-        id: input.id || nanoid(),
+        id,
+        // Ensure chainId is stored as integer
+        chainId: input.chainId ? Number(input.chainId) : null,
+        // Generate gift link
+        giftLink: input.giftLink || null,
       };
       
       const gift = await storage.createGift(giftData);
@@ -46,6 +50,14 @@ export async function registerRoutes(
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
       const input = api.gifts.claim.input.parse(req.body);
+      
+      // Validate that claimTxHash is a real tx hash (0x...) or 'pending'
+      if (input.claimTxHash && 
+          input.claimTxHash !== 'pending' && 
+          !input.claimTxHash.startsWith('0x')) {
+        return res.status(400).json({ message: 'Invalid claimTxHash format' });
+      }
+      
       const gift = await storage.updateGiftStatus(id, input);
       
       if (!gift) {
@@ -63,17 +75,13 @@ export async function registerRoutes(
     }
   });
 
-  // Seed Data Endpoint (Optional, or auto-seed)
+  // Seed Data Endpoint
   await seedDatabase();
 
   return httpServer;
 }
 
 async function seedDatabase() {
-  // Check if we have any gifts
-  // Since we don't have a getAll, we can't easily check count without adding method.
-  // We'll just try to fetch a specific known ID or just skip for now to avoid duplicates if persistent.
-  // Actually, let's just create one demo gift if it doesn't exist.
   const demoId = "demo-gift-123";
   const existing = await storage.getGift(demoId);
   
@@ -86,6 +94,7 @@ async function seedDatabase() {
       amount: "10",
       message: "Happy Birthday! Have a coffee on me.",
       status: "created",
+      chainId: 84532, // Base Sepolia
       visualAssets: { sticker: "cake" },
     });
   }

@@ -1,48 +1,65 @@
-import { useAccount, useConnect, useDisconnect, useBalance } from 'wagmi';
-import { baseSepolia, base } from 'wagmi/chains';
-import { USDC_ADDRESS, BASE_CHAIN_ID } from '@/lib/wagmi';
+import { useAccount, useConnect, useDisconnect, useBalance, useChainId } from 'wagmi';
+import { USDC_ADDRESS } from '@/lib/wagmi';
+import { useMemo, useCallback } from 'react';
 
 export function useWallet() {
   const { address, isConnected, chain } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connect, connectors, isPending: isConnecting, reset } = useConnect();
   const { disconnect } = useDisconnect();
+  const chainId = useChainId();
 
-  // Получаем баланс ETH
-  const { data: ethBalance } = useBalance({
+  const { data: ethBalance, refetch: refetchEth } = useBalance({
     address,
-    chainId: BASE_CHAIN_ID,
+    chainId,
+    query: {
+      enabled: !!address,
+      staleTime: 15_000,
+    },
   });
 
-  // Получаем баланс USDC
-  const { data: usdcBalance } = useBalance({
+  const { data: usdcBalance, refetch: refetchUsdc } = useBalance({
     address,
-    token: USDC_ADDRESS[BASE_CHAIN_ID],
-    chainId: BASE_CHAIN_ID,
+    token: USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS],
+    chainId,
+    query: {
+      enabled: !!address,
+      staleTime: 15_000,
+    },
   });
 
-  // Функция для подключения кошелька
-  const connectWallet = async () => {
-    try {
-      // Пробуем подключиться через injected connector (MetaMask, Coinbase Wallet и т.д.)
-      const injectedConnector = connectors.find((c) => c.id === 'injected');
-      if (injectedConnector) {
-        connect({ connector: injectedConnector, chainId: BASE_CHAIN_ID });
-      } else if (connectors[0]) {
-        // Если нет injected, используем первый доступный (обычно WalletConnect)
-        connect({ connector: connectors[0], chainId: BASE_CHAIN_ID });
-      }
-    } catch (error) {
-      console.error('Failed to connect wallet:', error);
+  // Connect via the first available connector (coinbaseWallet).
+  const connectWallet = useCallback(() => {
+    if (isConnecting) reset();
+
+    const connector = connectors[0];
+    if (connector) {
+      connect(
+        { connector },
+        {
+          onError: (err) => {
+            console.error('[useWallet] Connection failed:', err);
+            reset();
+          },
+        },
+      );
     }
-  };
+  }, [connectors, connect, isConnecting, reset]);
 
-  return {
+  // Force-refresh both ETH + USDC balances (call after gift creation/claim)
+  const refetchBalances = useCallback(() => {
+    refetchEth();
+    refetchUsdc();
+  }, [refetchEth, refetchUsdc]);
+
+  return useMemo(() => ({
     address,
     isConnected,
+    isConnecting,
     connect: connectWallet,
     disconnect,
     chain,
     ethBalance,
     usdcBalance,
-  };
+    refetchBalances,
+  }), [address, isConnected, isConnecting, connectWallet, disconnect, chain, ethBalance, usdcBalance, refetchBalances]);
 }

@@ -1,17 +1,21 @@
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Gift, Zap, ShieldCheck, ArrowRight } from "lucide-react";
 import { useWallet } from "@/hooks/use-wallet";
 import { Navbar } from "@/components/Navbar";
+import { HowItWorks } from "@/components/HowItWorks";
 
 export default function Landing() {
   const { isConnected, connect } = useWallet();
   const [, setLocation] = useLocation();
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
 
-  const handleCreateClick = async () => {
+  const handleCreateClick = () => {
     if (!isConnected) {
-      await connect();
+      // Trigger connection — Coinbase Smart Wallet will prompt
+      connect();
     }
     setLocation("/create");
   };
@@ -58,9 +62,12 @@ export default function Landing() {
               Start Gifting <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             
-            <a href="#how-it-works" className="text-muted-foreground font-medium hover:text-primary transition-colors">
+            <button 
+              onClick={() => setShowHowItWorks(true)}
+              className="text-muted-foreground font-medium hover:text-primary transition-colors"
+            >
               How it works
-            </a>
+            </button>
           </div>
         </motion.div>
 
@@ -90,6 +97,8 @@ export default function Landing() {
       <footer className="py-8 text-center text-sm text-muted-foreground">
         <p>Built on Base 🔵</p>
       </footer>
+
+      <HowItWorks isOpen={showHowItWorks} onClose={() => setShowHowItWorks(false)} />
     </div>
   );
 }

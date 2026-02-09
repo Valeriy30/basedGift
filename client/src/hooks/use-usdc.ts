@@ -1,49 +1,59 @@
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from 'wagmi';
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { parseUnits, formatUnits } from 'viem';
-import { USDC_ADDRESS, ERC20_ABI, BASE_CHAIN_ID } from '@/lib/wagmi';
+import { USDC_ADDRESS, ERC20_ABI } from '@/lib/wagmi';
+import { useMemo } from 'react';
 
-// Хук для получения баланса USDC
+// Hook to get USDC balance
 export function useUSDCBalance() {
   const { address } = useAccount();
+  const chainId = useChainId();
 
   const { data: balance, isLoading, refetch } = useReadContract({
-    address: USDC_ADDRESS[BASE_CHAIN_ID],
+    address: USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS],
     abi: ERC20_ABI,
     functionName: 'balanceOf',
     args: address ? [address] : undefined,
-    chainId: BASE_CHAIN_ID,
+    chainId,
+    query: {
+      staleTime: 15_000,
+      enabled: !!address,
+    },
   });
 
-  // USDC имеет 6 decimals
-  const formattedBalance = balance ? formatUnits(balance as bigint, 6) : '0';
+  // USDC has 6 decimals
+  const formattedBalance = useMemo(() => 
+    balance ? formatUnits(balance as bigint, 6) : '0',
+    [balance]
+  );
 
-  return {
+  return useMemo(() => ({
     balance: formattedBalance,
     rawBalance: balance as bigint | undefined,
     isLoading,
     refetch,
-  };
+  }), [formattedBalance, balance, isLoading, refetch]);
 }
 
-// Хук для трансфера USDC
+// Hook for USDC transfer
 export function useTransferUSDC() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const chainId = useChainId();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
   
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
+    pollingInterval: 12000,
   });
 
   const transfer = async (to: string, amount: string) => {
     try {
-      // USDC имеет 6 decimals
       const amountInWei = parseUnits(amount, 6);
 
-      writeContract({
-        address: USDC_ADDRESS[BASE_CHAIN_ID],
+      await writeContractAsync({
+        address: USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS],
         abi: ERC20_ABI,
         functionName: 'transfer',
         args: [to as `0x${string}`, amountInWei],
-        chainId: BASE_CHAIN_ID,
+        chainId,
       });
     } catch (err) {
       console.error('Error transferring USDC:', err);
@@ -60,27 +70,55 @@ export function useTransferUSDC() {
   };
 }
 
-// Хук для approve USDC (если нужен для контракта эскроу)
+// Hook for approving USDC (needed for escrow contract)
 export function useApproveUSDC() {
-  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const chainId = useChainId();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
   
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
+    pollingInterval: 12000,
   });
 
   const approve = async (spender: string, amount: string) => {
     try {
+      console.log('[useApproveUSDC] Starting approve for', amount, 'USDC to', spender);
       const amountInWei = parseUnits(amount, 6);
 
-      writeContract({
-        address: USDC_ADDRESS[BASE_CHAIN_ID],
+      const txHash = await writeContractAsync({
+        address: USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS],
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [spender as `0x${string}`, amountInWei],
-        chainId: BASE_CHAIN_ID,
+        chainId,
+        gas: 80_000n,
       });
+
+      console.log('[useApproveUSDC] Approve tx sent:', txHash);
+
+      // Wait for on-chain confirmation before returning.
+      // createUSDCGift will call safeTransferFrom which needs the allowance on-chain.
+      const { getPublicClient } = await import('wagmi/actions');
+      const { config } = await import('@/lib/wagmi');
+      const publicClient = getPublicClient(config, { chainId });
+
+      if (publicClient && typeof txHash === 'string') {
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: txHash as `0x${string}`,
+          confirmations: 1,
+          timeout: 120_000,
+        });
+
+        if (receipt.status === 'reverted') {
+          throw new Error('Approve transaction reverted on-chain');
+        }
+
+        console.log('[useApproveUSDC] ✅ Approve confirmed on-chain');
+      }
+
+      return txHash;
     } catch (err) {
-      console.error('Error approving USDC:', err);
+      console.error('[useApproveUSDC] Error:', err);
       throw err;
     }
   };

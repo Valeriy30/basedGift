@@ -1,129 +1,142 @@
-# 🚀 Быстрый старт для разработки
+# 🚀 Quick Start Guide
 
-Если у вас проблемы с подключением к PostgreSQL/Supabase, используйте локальную SQLite базу для разработки.
+Get basedGift running in 5 minutes!
 
-## Вариант 1: Локальная SQLite база (рекомендуется для разработки)
+## Prerequisites
 
-### 1. Установите better-sqlite3
+- Node.js 18+
+- A wallet (MetaMask, Coinbase Wallet, etc.)
+- WalletConnect Project ID ([get free here](https://cloud.walletconnect.com/))
 
-```bash
-npm install better-sqlite3 @types/better-sqlite3
-```
-
-### 2. Обновите server/db.ts
-
-Замените содержимое на:
-
-```typescript
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { gifts } from '@shared/schema';
-
-const sqlite = new Database('local.db');
-export const db = drizzle(sqlite, { schema: { gifts } });
-```
-
-### 3. Создайте таблицу вручную
+## Step 1: Installation
 
 ```bash
-sqlite3 local.db "CREATE TABLE IF NOT EXISTS gifts (
-  id TEXT PRIMARY KEY,
-  sender_address TEXT NOT NULL,
-  receiver_address TEXT,
-  token_type TEXT NOT NULL,
-  token_address TEXT,
-  token_id TEXT,
-  amount TEXT,
-  message TEXT,
-  theme TEXT NOT NULL DEFAULT 'default',
-  visual_assets TEXT,
-  status TEXT NOT NULL DEFAULT 'created',
-  escrow_tx_hash TEXT,
-  claim_tx_hash TEXT,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);"
+# Clone and install
+npm install
+
+# Create environment file
+cp .env.example .env
 ```
 
-### 4. Запустите приложение
+## Step 2: Configure .env
 
-```bash
-npm run dev
-```
-
-Приложение будет доступно по адресу http://localhost:5000
-
-## Вариант 2: Использовать PostgreSQL
-
-### Настройте Supabase
-
-1. Создайте новый проект на https://supabase.com
-2. Скопируйте Connection Pooler URL из Settings → Database
-3. Обновите `.env`:
+Edit `.env` and add:
 
 ```env
-DATABASE_URL=postgresql://postgres.[YOUR-PROJECT-REF]:[YOUR-PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres
+VITE_WALLETCONNECT_PROJECT_ID=your_project_id_here
+DATABASE_URL=postgresql://user:password@host:5432/database
 ```
 
-### Примените схему
+## Step 3: Database Setup
+
+### Option A: Quick SQLite (Development)
+
+For local development, use SQLite:
 
 ```bash
 npm run db:push
 ```
 
-## Тестирование функционала
+### Option B: PostgreSQL/Supabase (Production)
 
-### 1. Подключение кошелька
+1. Create a database on [Supabase](https://supabase.com/)
+2. Copy the connection string to `.env`
+3. Run migrations:
 
-- Используйте MetaMask, Coinbase Wallet или другой Web3 кошелек
-- Переключитесь на Base Sepolia testnet (Chain ID: 84532)
-- Получите testnet токены: https://www.coinbase.com/faucets/base-ethereum-goerli-faucet
+```bash
+npm run db:push
+```
 
-### 2. Получение testnet USDC
+## Step 4: Deploy Smart Contract
 
-Свопните немного ETH на USDC через:
-- https://app.uniswap.org/swap (переключитесь на Base Sepolia)
-- Или используйте faucet если доступен
+**Important:** You need to deploy the GiftEscrow contract before the app will work.
 
-### 3. Создание подарка
+1. Install Foundry:
+```bash
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
+```
 
-1. Нажмите "Create Gift"
-2. Выберите USDC и введите сумму
-3. Кастомизируйте с градиентом и стикерами
-4. Создайте ссылку
+2. Deploy to Base Sepolia (testnet):
+```bash
+cd contracts
+forge script script/Deploy.s.sol --rpc-url https://sepolia.base.org --broadcast --verify
+```
 
-### 4. Тестирование получения
+3. Copy the contract address and update `client/src/lib/wagmi.ts`:
+```typescript
+export const ESCROW_CONTRACT_ADDRESS = {
+  [base.id]: '0xYourMainnetAddress',
+  [baseSepolia.id]: '0xYourTestnetAddress', // ← Paste here
+} as const;
+```
 
-1. Скопируйте ссылку
-2. Откройте в новом окне/браузере
-3. Подключите другой кошелек
-4. Claim подарок
+## Step 5: Run the App
 
-## Известные ограничения (текущая версия)
+```bash
+npm run dev
+```
 
-⚠️ **Важно**: Текущая версия использует упрощенную логику:
+Open http://localhost:5000
 
-1. **Нет escrow контракта** - средства не блокируются
-2. **Прямой трансфер** - транзакция происходит при claim
-3. **Отправитель должен быть онлайн** - для выполнения трансфера
+## Step 6: Test with Testnet Tokens
 
-Для продакшена необходимо:
-- Задеплоить escrow контракт (см. `contracts/GiftEscrow.sol`)
-- Интегрировать с контрактом (см. `contracts/DEPLOY.md`)
-- Добавить NFT API интеграцию
+1. **Get Base Sepolia ETH**
+   - Visit https://www.coinbase.com/faucets/base-ethereum-goerli-faucet
+   - Connect wallet and claim testnet ETH
 
-## Следующие шаги
+2. **Get Base Sepolia USDC**
+   - Swap some ETH for USDC on [Uniswap](https://app.uniswap.org/swap)
+   - Switch to Base Sepolia network
+   - Use USDC address: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
 
-1. ✅ Протестируйте создание подарка с USDC
-2. ✅ Проверьте градиенты и стикеры
-3. ⬜ Задеплойте escrow контракт
-4. ⬜ Интегрируйте escrow в приложение
-5. ⬜ Добавьте NFT функционал
-6. ⬜ Добавьте Base Account интеграцию
+## Testing the App
 
-## Помощь
+### Create a Gift
+1. Click "Start Gifting"
+2. Connect wallet (switch to Base Sepolia)
+3. Choose USDC or ETH
+4. Enter amount (e.g., 1 USDC)
+5. Customize with colors and stickers
+6. Create gift link
 
-Если возникли проблемы:
-1. Проверьте console в браузере (F12)
-2. Убедитесь что кошелек подключен к Base Sepolia
-3. Проверьте что у вас есть testnet ETH и USDC
-4. Проверьте .env файл
+### Claim the Gift
+1. Copy the gift link
+2. Open in incognito/different browser
+3. Connect a different wallet
+4. Click to reveal gift
+5. Claim to wallet
+
+## Troubleshooting
+
+### "Transaction Failed"
+- Make sure you're on Base Sepolia network
+- Check you have enough ETH for gas
+- Ensure you approved USDC before creating gift
+
+### "Gift not found"
+- Check the link is correct
+- Make sure the gift was created successfully
+- Check database connection
+
+### "Wallet not connecting"
+- Try a different browser
+- Clear browser cache
+- Update your wallet extension
+
+## Next Steps
+
+- ✅ Test creating and claiming gifts
+- ✅ Customize colors and messages
+- 📖 Read [README.md](./README.md) for full documentation
+- 🚀 Deploy to mainnet using [TESTNET_REMOVAL_GUIDE.md](./TESTNET_REMOVAL_GUIDE.md)
+
+## Need Help?
+
+- Check [README.md](./README.md) for detailed docs
+- Review smart contract in `contracts/src/GiftEscrow.sol`
+- Create an issue on GitHub
+
+---
+
+**Ready?** Run `npm run dev` and start gifting! 🎁
