@@ -11,12 +11,16 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     using SafeERC20 for IERC20; 
 
+    /// @notice Gift expiry period — 7 days after creation
+    uint256 public constant GIFT_EXPIRY = 7 days;
+
     struct Gift {
         address sender;
         address tokenAddress;
         uint256 amountOrTokenId;
         bool isNFT;
         bool claimed;
+        bool refunded;
         uint256 createdAt;
     }
 
@@ -25,6 +29,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     event GiftCreated(bytes32 indexed giftId, address indexed sender, address tokenAddress, uint256 amountOrTokenId, bool isNFT);
     event GiftClaimed(bytes32 indexed giftId, address indexed recipient);
     event GiftRefunded(bytes32 indexed giftId, address indexed sender);
+    event GiftExpired(bytes32 indexed giftId);
 
     constructor() Ownable(msg.sender) {}
 
@@ -33,7 +38,6 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
         require(amount > 0, "Amount must be greater than 0");
         require(usdcAddress != address(0), "Invalid token address");
 
-        // Use safeTransferFrom instead of regular transferFrom
         IERC20(usdcAddress).safeTransferFrom(msg.sender, address(this), amount);
 
         gifts[giftId] = Gift({
@@ -42,6 +46,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             amountOrTokenId: amount,
             isNFT: false,
             claimed: false,
+            refunded: false,
             createdAt: block.timestamp
         });
 
@@ -58,10 +63,11 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
 
         gifts[giftId] = Gift({
             sender: msg.sender,
-            tokenAddress: address(0), // address(0) indicates ETH
+            tokenAddress: address(0),
             amountOrTokenId: msg.value,
             isNFT: false,
             claimed: false,
+            refunded: false,
             createdAt: block.timestamp
         });
 
@@ -72,7 +78,6 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
         require(gifts[giftId].sender == address(0), "Gift ID already exists");
         require(nftAddress != address(0), "Invalid NFT address");
 
-        // Contract can now safely receive NFTs thanks to ERC721Holder
         IERC721(nftAddress).transferFrom(msg.sender, address(this), tokenId);
 
         gifts[giftId] = Gift({
@@ -81,6 +86,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             amountOrTokenId: tokenId,
             isNFT: true,
             claimed: false,
+            refunded: false,
             createdAt: block.timestamp
         });
 
@@ -91,19 +97,17 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
         Gift storage gift = gifts[giftId];
         require(gift.sender != address(0), "Gift does not exist");
         require(!gift.claimed, "Gift already claimed");
+        require(!gift.refunded, "Gift already refunded");
 
         gift.claimed = true;
 
         if (gift.isNFT) {
             IERC721(gift.tokenAddress).safeTransferFrom(address(this), msg.sender, gift.amountOrTokenId);
         } else {
-            // Check if it's ETH (address(0)) or ERC20 token
             if (gift.tokenAddress == address(0)) {
-                // Transfer ETH
                 (bool success, ) = msg.sender.call{value: gift.amountOrTokenId}("");
                 require(success, "ETH transfer failed");
             } else {
-                // Transfer ERC20 token
                 IERC20(gift.tokenAddress).safeTransfer(msg.sender, gift.amountOrTokenId);
             }
         }
@@ -112,7 +116,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     }
 
     /**
-     * @dev Refund gift to sender (if not claimed yet)
+     * @dev Refund gift to sender (sender-initiated, anytime before claim)
      * @param giftId Gift ID
      */
     function refundGift(bytes32 giftId) external nonReentrant {
@@ -120,28 +124,54 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
         
         require(gift.sender == msg.sender, "Only sender can refund");
         require(!gift.claimed, "Gift already claimed");
+        require(!gift.refunded, "Gift already refunded");
 
-        // Mark as claimed (to prevent double refund)
-        gift.claimed = true;
+        gift.refunded = true;
 
-        // Refund to sender
+        _transferToSender(gift);
+
+        emit GiftRefunded(giftId, msg.sender);
+    }
+
+    /**
+     * @dev Refund expired gift — anyone can trigger after 7 days.
+     *      Funds are returned to the original sender.
+     * @param giftId Gift ID
+     */
+    function refundExpiredGift(bytes32 giftId) external nonReentrant {
+        Gift storage gift = gifts[giftId];
+
+        require(gift.sender != address(0), "Gift does not exist");
+        require(!gift.claimed, "Gift already claimed");
+        require(!gift.refunded, "Gift already refunded");
+        require(block.timestamp >= gift.createdAt + GIFT_EXPIRY, "Gift has not expired yet");
+
+        gift.refunded = true;
+
+        _transferToSender(gift);
+
+        emit GiftExpired(giftId);
+        emit GiftRefunded(giftId, gift.sender);
+    }
+
+    /**
+     * @dev Internal helper — transfer gift assets back to sender
+     */
+    function _transferToSender(Gift storage gift) internal {
         if (gift.isNFT) {
             IERC721(gift.tokenAddress).transferFrom(
                 address(this),
-                msg.sender,
+                gift.sender,
                 gift.amountOrTokenId
             );
         } else {
-            // Check if it's ETH or ERC20
             if (gift.tokenAddress == address(0)) {
-                (bool success, ) = msg.sender.call{value: gift.amountOrTokenId}("");
+                (bool success, ) = gift.sender.call{value: gift.amountOrTokenId}("");
                 require(success, "ETH refund failed");
             } else {
-                IERC20(gift.tokenAddress).safeTransfer(msg.sender, gift.amountOrTokenId);
+                IERC20(gift.tokenAddress).safeTransfer(gift.sender, gift.amountOrTokenId);
             }
         }
-
-        emit GiftRefunded(giftId, msg.sender);
     }
 
     /**
@@ -157,6 +187,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             uint256 amountOrTokenId,
             bool isNFT,
             bool claimed,
+            bool refunded,
             uint256 createdAt
         ) 
     {
@@ -167,8 +198,8 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             gift.amountOrTokenId,
             gift.isNFT,
             gift.claimed,
+            gift.refunded,
             gift.createdAt
         );
     }
 }
-
