@@ -22,7 +22,9 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Navbar />
+      <div className="sticky top-0 z-50 w-full">
+        <Navbar />
+      </div>
       
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 py-20 relative overflow-hidden">

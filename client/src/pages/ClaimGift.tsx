@@ -212,7 +212,7 @@ export default function ClaimGift() {
   const isRefunded = isRefundedOnChain;
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
+    <div className="min-h-screen flex flex-col relative ">
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
       

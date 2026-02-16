@@ -146,7 +146,7 @@ export const ERC721_ABI = [
 // Escrow Contract Addresses
 export const ESCROW_CONTRACT_ADDRESS = {
   [base.id]: '0x2856EEC9898e66684928ADe2f42F178210BB9449',
-  [baseSepolia.id]: '0x9636A9c4bD8295071d063E82433E3d021D49D05d',
+  [baseSepolia.id]: '0x63817b20338eFE38e9F843dA652ca451f0D3fC09',
 } as const;
 
 // Updated ABI — includes refundExpiredGift + refunded field in getGiftInfo

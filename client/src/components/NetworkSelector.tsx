@@ -1,64 +1,88 @@
-import { useSwitchChain, useChainId } from 'wagmi';
+import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useAccount, useSwitchChain } from 'wagmi';
 import { base, baseSepolia } from 'wagmi/chains';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ChevronDown, Check } from 'lucide-react';
-import { TESTNET_MODE } from '@/lib/wagmi';
 
-const NETWORKS = [
-  { chain: base, name: 'Base', icon: '🔵', enabled: true },
-  { chain: baseSepolia, name: 'Base Sepolia', icon: '🔷', enabled: TESTNET_MODE },
+// Иконка Base (упрощенная версия логотипа)
+const BaseIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 111 111" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M54.921 110.034C85.359 110.034 110.034 85.402 110.034 55.017C110.034 24.6319 85.359 0 54.921 0C26.0432 0 2.35281 22.1714 0 50.3923H72.8467V59.6416H3.9565e-07C2.35281 87.8625 26.0432 110.034 54.921 110.034Z" fill="#0052FF"/>
+  </svg>
+);
+
+const networks = [
+  {
+    id: base.id,
+    name: 'Base',
+    icon: <BaseIcon />,
+    chain: base,
+  },
+  {
+    id: baseSepolia.id,
+    name: 'Base Sepolia',
+    icon: <BaseIcon />,
+    chain: baseSepolia,
+  },
 ];
 
 export function NetworkSelector() {
-  const currentChainId = useChainId();
+  const [isOpen, setIsOpen] = useState(false);
+  const { chain } = useAccount();
   const { switchChain } = useSwitchChain();
 
-  const currentNetwork = NETWORKS.find((n) => n.chain.id === currentChainId) || NETWORKS[0];
-  const availableNetworks = NETWORKS.filter((n) => n.enabled);
+  const currentNetwork = networks.find((n) => n.id === chain?.id) || networks[0];
 
-  const handleNetworkSwitch = (chainId: number) => {
-    switchChain({ chainId });
+  const handleNetworkChange = (networkId: number) => {
+    switchChain({ chainId: networkId });
+    setIsOpen(false);
   };
 
-  if (availableNetworks.length === 1) {
-    return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border">
-        <span className="text-lg">{currentNetwork.icon}</span>
-        <span className="text-sm font-medium hidden sm:inline">{currentNetwork.name}</span>
-      </div>
-    );
-  }
-
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="gap-2 rounded-full border-2 border-primary/20 hover:border-primary/50">
-          <span className="text-lg">{currentNetwork.icon}</span>
-          <span className="font-medium hidden sm:inline">{currentNetwork.name}</span>
-          <ChevronDown size={16} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-48 rounded-xl">
-        {availableNetworks.map((network) => (
-          <DropdownMenuItem
-            key={network.chain.id}
-            onClick={() => handleNetworkSwitch(network.chain.id)}
-            className="cursor-pointer flex items-center justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-lg">{network.icon}</span>
-              <span>{network.name}</span>
-            </div>
-            {currentChainId === network.chain.id && <Check size={16} className="text-primary" />}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 text-black hover:bg-white/15 hover:border-white/30 transition-all duration-200 shadow-lg"
+      >
+        <div className="flex items-center gap-2">
+          {currentNetwork.icon}
+          <span className="font-medium text-sm">{currentNetwork.name}</span>
+        </div>
+        <ChevronDown 
+          size={16} 
+          className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+        />
+      </button>
+
+      {isOpen && (
+        <>
+          {/* Overlay для закрытия при клике вне */}
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setIsOpen(false)}
+          />
+          
+          {/* Dropdown menu */}
+          <div className="absolute right-0 mt-2 w-48 bg-white backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50">
+            {networks.map((network) => (
+              <button
+                key={network.id}
+                onClick={() => handleNetworkChange(network.id)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                  currentNetwork.id === network.id
+                    ? 'text-black'
+                    : 'text-black/80 hover:bg-white/10 hover:text-black/20'
+                }`}
+              >
+                {network.icon}
+                <span className="font-medium text-sm">{network.name}</span>
+                {currentNetwork.id === network.id && (
+                  <div className="ml-auto w-2 h-2 bg-green-400 rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
