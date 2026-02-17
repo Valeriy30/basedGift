@@ -7,6 +7,9 @@ import {
   WalletDropdown, 
   WalletDropdownDisconnect,
 } from '@coinbase/onchainkit/wallet';
+import { WalletButton } from "./WalletButton";
+
+
 import { 
   Avatar, 
   Name, 
@@ -30,21 +33,8 @@ export function Navbar() {
 
           <div className="flex items-center gap-3">
             <NetworkSelector />
-
-            <Wallet>
-              <ConnectWallet className="rounded-full font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all">
-                <Avatar className="h-6 w-6" />
-                <Name />
-              </ConnectWallet>
-              <WalletDropdown>
-                <Identity className="px-4 pt-3 pb-2" hasCopyAddressOnClick>
-                  <Avatar />
-                  <Name />
-                  <Address />
-                </Identity>
-                <WalletDropdownDisconnect />
-              </WalletDropdown>
-            </Wallet>
+            <WalletButton></WalletButton>
+            
           </div>
         </div>
       </div>

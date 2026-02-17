@@ -19,6 +19,16 @@ export default function ClaimGift() {
   const [, params] = useRoute("/claim/:id");
   const [, setLocation] = useLocation();
   const giftId = params?.id || "";
+
+  // ИЗМЕНЕНИЕ: читаем secret из URL параметра ?s=0x...
+  // Ссылка имеет вид: /claim/<giftId>?s=<secret>
+  // Secret НИКОГДА не хранится в БД — только в URL
+  const secret = (() => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('s') as `0x${string}` | null;
+  })();
+
   const { data: gift, isLoading: isGiftLoading } = useGift(giftId);
   const { address, isConnected, connect, refetchBalances } = useWallet();
   const claimGift = useClaimGift();
@@ -28,19 +38,20 @@ export default function ClaimGift() {
   const { chainId: walletChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
 
-  // The chain where this gift lives (from DB) — fallback to TARGET_CHAIN
   const giftChainId = gift?.chainId || TARGET_CHAIN.id;
   const { giftInfo, isLoading: isLoadingGiftInfo, refetch: refetchGiftInfo } = useGiftInfo(giftId, giftChainId);
 
   const [isOpened, setIsOpened] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Network validation — compare wallet's actual chain to the gift's chain
   const isWrongNetwork = isConnected && walletChainId !== giftChainId;
   const isClaimedOnChain = giftInfo ? giftInfo[4] : false;
   const isRefundedOnChain = giftInfo ? giftInfo[5] : false;
 
-  // Multi-tab claim prevention
+  // ИЗМЕНЕНИЕ: проверяем наличие secret при открытии страницы
+  // Если secret отсутствует — ссылка неполная, клейм невозможен
+  const isSecretMissing = !secret;
+
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === `gift_claimed_${giftId}` && e.newValue === 'true') {
@@ -56,7 +67,6 @@ export default function ClaimGift() {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, [giftId, refetchGiftInfo, toast]);
 
-  // Confetti on claim success
   useEffect(() => {
     if (isOpened) {
       const duration = 3 * 1000;
@@ -90,6 +100,16 @@ export default function ClaimGift() {
       return;
     }
 
+    // ИЗМЕНЕНИЕ: проверяем secret перед клеймом
+    if (!secret) {
+      toast({
+        title: "Invalid Link",
+        description: "This gift link is incomplete. The secret key is missing.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (isClaimedOnChain) {
       toast({ title: "Already Claimed", description: "This gift has already been claimed", variant: "destructive" });
       return;
@@ -109,7 +129,6 @@ export default function ClaimGift() {
     setIsSubmitting(true);
 
     try {
-      // Auto-switch chain if needed (same fix as CreateGift)
       if (walletChainId !== giftChainId) {
         toast({ title: "Switching network", description: `Switching to ${getChainName(giftChainId)}...` });
         await switchChainAsync({ chainId: giftChainId });
@@ -117,7 +136,8 @@ export default function ClaimGift() {
 
       toast({ title: "Initiating claim", description: "Please confirm the transaction in your wallet" });
 
-      const txHash = await sendClaimTx(gift.id, giftChainId);
+      // ИЗМЕНЕНИЕ: передаём secret в sendClaimTx
+      const txHash = await sendClaimTx(gift.id, secret, giftChainId);
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -129,7 +149,6 @@ export default function ClaimGift() {
 
       localStorage.setItem(`gift_claimed_${gift.id}`, 'true');
 
-      // Refresh balances so the claimed amount appears immediately
       refetchBalances();
       refetchGiftInfo();
       queryClient.invalidateQueries();
@@ -147,10 +166,14 @@ export default function ClaimGift() {
     } catch (error: any) {
       console.error('Claim error:', error);
       const reason = error?.cause?.reason || error?.shortMessage || error?.message || "";
-      
+
       toast({
         title: "Claim failed",
-        description: reason.includes("rate limited")
+        description: reason.includes("Invalid secret")
+          ? "This link appears to be invalid or tampered with."
+          : reason.includes("Gift has expired")
+          ? "This gift has expired (7 days limit)."
+          : reason.includes("rate limited")
           ? "Too many requests. Please wait a moment and try again."
           : reason.includes("user rejected")
           ? "Transaction cancelled"
@@ -162,7 +185,7 @@ export default function ClaimGift() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [gift, address, giftChainId, walletChainId, isClaimedOnChain, isRefundedOnChain, isSubmitting, isClaimingInBlockchain, claimGift, sendClaimTx, switchChainAsync, refetchBalances, refetchGiftInfo, queryClient, toast]);
+  }, [gift, address, secret, giftChainId, walletChainId, isClaimedOnChain, isRefundedOnChain, isSubmitting, isClaimingInBlockchain, claimGift, sendClaimTx, switchChainAsync, refetchBalances, refetchGiftInfo, queryClient, toast]);
 
   const STICKERS: Record<string, string> = {
     cake: '🎂', party: '🥳', balloon: '🎈', champagne: '🥂', confetti: '🎉',
@@ -202,6 +225,25 @@ export default function ClaimGift() {
     );
   }
 
+  // ИЗМЕНЕНИЕ: показываем предупреждение если secret отсутствует в URL
+  if (isSecretMissing) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 mb-4">
+            <AlertTriangle size={32} />
+          </div>
+          <h2 className="text-2xl font-bold mb-2 text-center">Incomplete Link</h2>
+          <p className="text-muted-foreground text-center max-w-sm mb-6">
+            This gift link is missing the secret key. Make sure you copied the full link from the sender.
+          </p>
+          <Button onClick={() => setLocation('/')}>Go Home</Button>
+        </div>
+      </div>
+    );
+  }
+
   const visualAssets = (gift.visualAssets as any) || {};
   const senderName = visualAssets.senderName || 'Someone';
   const bgImage = visualAssets.bgImage;
@@ -212,10 +254,10 @@ export default function ClaimGift() {
   const isRefunded = isRefundedOnChain;
 
   return (
-    <div className="min-h-screen flex flex-col relative ">
+    <div className="min-h-screen flex flex-col relative overflow-hidden">
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
-      
+
       <Navbar />
 
       <main className="flex-1 flex flex-col items-center justify-center p-4 relative">
@@ -319,14 +361,13 @@ export default function ClaimGift() {
                 </div>
 
                 <div className="p-6 bg-white space-y-4">
-                  {/* Wrong Network Warning */}
                   {isWrongNetwork && (
                     <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                       <AlertTriangle className="text-amber-600 flex-shrink-0" size={24} />
                       <div className="flex-1">
                         <p className="text-sm font-bold text-amber-800">Wrong Network</p>
                         <p className="text-xs text-amber-600">
-                          This gift was created on {getChainName(giftChainId)}. 
+                          This gift was created on {getChainName(giftChainId)}.
                           You are on chain {walletChainId}.
                         </p>
                       </div>
@@ -341,7 +382,6 @@ export default function ClaimGift() {
                     </div>
                   )}
 
-                  {/* Refunded state */}
                   {isRefunded ? (
                     <div className="text-center py-6">
                       <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center text-amber-600 mx-auto mb-4">

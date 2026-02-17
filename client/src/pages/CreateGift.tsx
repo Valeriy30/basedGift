@@ -16,7 +16,7 @@ import { useUSDCBalance } from "@/hooks/use-usdc";
 import { useToast } from "@/hooks/use-toast";
 import { useUserNFTs } from "@/hooks/use-nft";
 import { nanoid } from "nanoid";
-import { useCreateUSDCGift, useCreateETHGift, useCreateNFTGift, useApproveNFT, giftIdToBytes32 } from '@/hooks/use-escrow';
+import { useCreateUSDCGift, useCreateETHGift, useCreateNFTGift, useApproveNFT, giftIdToBytes32} from '@/hooks/use-escrow'; // ИЗМЕНЕНИЕ: импорт generateSecret
 import { useApproveUSDC } from '@/hooks/use-usdc';
 import { ESCROW_CONTRACT_ADDRESS, USDC_ADDRESS, truncateNFTName, getChainName, getChainIcon } from '@/lib/wagmi';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
@@ -94,10 +94,9 @@ export default function CreateGift() {
   const queryClient = useQueryClient();
   const chainId = useChainId();
 
-  // For auto-switching wallet to the correct chain before transactions
   const { chainId: walletChainId } = useAccount();
   const { switchChainAsync } = useSwitchChain();
-  
+
   const { approve, isPending: isApproving } = useApproveUSDC();
   const { createGift: createUSDCGiftOnChain, isPending: isCreatingUSDC } = useCreateUSDCGift();
   const { createGift: createETHGiftOnChain, isPending: isCreatingETH } = useCreateETHGift();
@@ -158,10 +157,10 @@ export default function CreateGift() {
         }
         const balance = parseFloat(usdcBalance);
         if (amount > balance) {
-          toast({ 
-            title: "Insufficient balance", 
-            description: `You only have ${balance.toFixed(2)} USDC. Cannot gift ${amount.toFixed(2)} USDC.`, 
-            variant: "destructive" 
+          toast({
+            title: "Insufficient balance",
+            description: `You only have ${balance.toFixed(2)} USDC. Cannot gift ${amount.toFixed(2)} USDC.`,
+            variant: "destructive"
           });
           return;
         }
@@ -178,10 +177,10 @@ export default function CreateGift() {
         }
         const balance = ethBalance ? parseFloat(ethBalance.formatted) : 0;
         if (amount > balance) {
-          toast({ 
-            title: "Insufficient balance", 
-            description: `You only have ${balance.toFixed(4)} ETH. Cannot gift ${amount.toFixed(4)} ETH.`, 
-            variant: "destructive" 
+          toast({
+            title: "Insufficient balance",
+            description: `You only have ${balance.toFixed(4)} ETH. Cannot gift ${amount.toFixed(4)} ETH.`,
+            variant: "destructive"
           });
           return;
         }
@@ -208,10 +207,6 @@ export default function CreateGift() {
     try {
       if (!address) throw new Error("Wallet not connected");
 
-      // ── Ensure the wallet is on the correct chain ──
-      // Coinbase Wallet in Base App may start on Ethereum Mainnet (chain 1).
-      // Without this, writeContractAsync throws:
-      //   "current chain of the wallet (id: 1) does not match target chain (id: 84532)"
       if (walletChainId !== chainId) {
         toast({ title: "Switching network", description: `Switching to ${getChainName(chainId)}...` });
         await switchChainAsync({ chainId });
@@ -224,31 +219,38 @@ export default function CreateGift() {
 
       if (!contractAddress) throw new Error("Contract not found for this network");
 
+      // ИЗМЕНЕНИЕ: генерируем secret один раз для всего подарка
+      // secret → только в URL ссылки, никогда не в БД
+      // claimHash → передаётся в контракт
+      
+
       let escrowTxHash: string | undefined;
 
       if (formData.assetType === 'USDC') {
         setTxProgress(TX_STEPS.APPROVING);
         toast({ title: "Step 1/3", description: "Approving USDC..." });
-        
+
         await approve(ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS], formData.amount);
-        
+
         setTxProgress(TX_STEPS.APPROVED);
         toast({ title: "Step 1/3 ✓", description: "USDC approved! Creating gift..." });
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 2/3", description: "Creating gift on blockchain..." });
-        escrowTxHash = await createUSDCGiftOnChain(newGiftId, formData.amount);
-        
+        // ИЗМЕНЕНИЕ: передаём claimHash
+        escrowTxHash = await createUSDCGiftOnChain(newGiftId, formData.amount, claimHash);
+
         setTxProgress(TX_STEPS.CREATED);
         toast({ title: "Step 2/3 ✓", description: "Gift created on-chain!" });
-        
+
       } else if (formData.assetType === 'ETH') {
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 1/2", description: "Creating gift on blockchain..." });
-        escrowTxHash = await createETHGiftOnChain(newGiftId, formData.amount);
-        
+        // ИЗМЕНЕНИЕ: передаём claimHash
+        escrowTxHash = await createETHGiftOnChain(newGiftId, formData.amount, claimHash);
+
         setTxProgress(TX_STEPS.CREATED);
 
       } else if (formData.assetType === 'NFT') {
@@ -256,7 +258,6 @@ export default function CreateGift() {
           throw new Error("NFT not selected");
         }
 
-        // Step 1: Approve escrow to transfer the NFT
         setTxProgress(TX_STEPS.APPROVING);
         toast({ title: "Step 1/3", description: "Approving NFT transfer..." });
         await approveNFT(formData.nftContractAddress, formData.nftTokenId);
@@ -266,10 +267,10 @@ export default function CreateGift() {
 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
-        // Step 2: Create NFT gift on escrow (transfers NFT to contract)
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 2/3", description: "Creating NFT gift on blockchain..." });
-        escrowTxHash = await createNFTGiftOnChain(newGiftId, formData.nftContractAddress, formData.nftTokenId);
+        // ИЗМЕНЕНИЕ: передаём claimHash вторым аргументом
+        escrowTxHash = await createNFTGiftOnChain(newGiftId, claimHash, formData.nftContractAddress, formData.nftTokenId);
 
         setTxProgress(TX_STEPS.CREATED);
         toast({ title: "Step 2/3 ✓", description: "NFT gift created on-chain!" });
@@ -277,12 +278,13 @@ export default function CreateGift() {
 
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Save to database
       setTxProgress(TX_STEPS.SAVING);
       toast({ title: `Step ${formData.assetType === 'ETH' ? '2/2' : '3/3'}`, description: "Saving gift..." });
-      
-      const giftLink = `${window.location.origin}/claim/${newGiftId}`;
-      
+
+      // ИЗМЕНЕНИЕ: secret кладётся ТОЛЬКО в giftLink — никогда не в БД!
+      // Получатель получает ссылку вида: /claim/<giftId>?s=<secret>
+      const giftLink = `${window.location.origin}/claim/${newGiftId}?s=${secret}`;
+
       const newGift = await createGift.mutateAsync({
         id: newGiftId,
         giftId: giftIdBytes32,
@@ -290,7 +292,7 @@ export default function CreateGift() {
         giftLink,
         senderAddress: address,
         tokenType: formData.assetType,
-        tokenAddress: formData.assetType === 'USDC' 
+        tokenAddress: formData.assetType === 'USDC'
           ? USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS]
           : formData.assetType === 'NFT'
           ? formData.nftContractAddress
@@ -313,10 +315,8 @@ export default function CreateGift() {
         status: 'created'
       });
 
-      // ── Refresh balances so "Create Another Gift" shows updated amounts ──
       refetchBalances();
       refetchUsdcBalance();
-      // Also invalidate all wagmi-managed queries (balance, readContract, etc.)
       queryClient.invalidateQueries();
 
       setTxProgress(TX_STEPS.DONE);
@@ -354,13 +354,11 @@ export default function CreateGift() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
 
-        {/* Network indicator */}
         <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
           <span>{getChainIcon(chainId)}</span>
           <span>Creating on <strong className="text-foreground">{getChainName(chainId)}</strong></span>
         </div>
 
-        {/* Progress Bar */}
         <div className="mb-12">
           <div className="flex justify-between mb-2">
             {STEPS.map((s, i) => (
@@ -440,7 +438,6 @@ export default function CreateGift() {
                           className="pl-8 h-14 text-xl rounded-xl border-2 focus-visible:ring-primary/20"
                           value={formData.amount}
                           onChange={(e) => {
-                            // Allow only digits and one decimal point
                             const v = e.target.value;
                             if (v === '' || /^\d*\.?\d*$/.test(v)) {
                               setFormData({ ...formData, amount: v });
@@ -453,25 +450,17 @@ export default function CreateGift() {
                           {isConnected ? `Balance: $${parseFloat(usdcBalance).toFixed(2)} USDC` : 'Connect wallet to see balance'}
                         </p>
                         {isConnected && parseFloat(usdcBalance) < parseFloat(formData.amount || '0') && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
+                          <Button
+                            variant="outline"
+                            size="sm"
                             className="gap-2 rounded-full border-blue-500 text-blue-600 hover:bg-blue-50"
                             onClick={() => {
-                              // FIX #5: Open Onramp in a popup window (not a new tab) for better UX
                               const fundingUrl = `https://pay.coinbase.com/buy/select-asset?appId=${import.meta.env.VITE_CDP_API_KEY}&addresses={"${address}":["base"]}&assets=["USDC"]&defaultAsset=USDC&defaultNetwork=base&defaultPaymentMethod=CARD&presetFiatAmount=${Math.ceil(parseFloat(formData.amount || '0'))}`;
-                              
-                              // Open as centered popup window (not full tab)
                               const width = 500;
                               const height = 700;
                               const left = (window.screen.width / 2) - (width / 2);
                               const top = (window.screen.height / 2) - (height / 2);
-                              
-                              window.open(
-                                fundingUrl,
-                                'coinbaseOnramp',
-                                `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`
-                              );
+                              window.open(fundingUrl, 'coinbaseOnramp', `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`);
                             }}
                           >
                             <ShoppingCart className="h-4 w-4" />
