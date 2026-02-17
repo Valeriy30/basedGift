@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "^1.44.0",
-    "@coinbase/onchainkit": "^1.1.2",
+    "@coinbase/onchainkit": "1.1.2",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
     "@radix-ui/react-accordion": "^1.2.4",
@@ -106,11 +106,17 @@
     "vite": "^7.3.0"
   },
   "overrides": {
+    "@coinbase/onchainkit": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
     "drizzle-kit": {
       "@esbuild-kit/esm-loader": "npm:tsx@^4.20.4"
     }
+    
   },
   "optionalDependencies": {
     "bufferutil": "^4.0.8"
   }
+  
 }
