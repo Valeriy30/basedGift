@@ -9,10 +9,10 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
-    using SafeERC20 for IERC20; 
+    using SafeERC20 for IERC20;
 
-    /// @notice Gift expiry period — 7 days after creation
-    uint256 public constant GIFT_EXPIRY = 7 days;
+    /// @notice Gift expiry period — 14 days after creation
+    uint256 public constant GIFT_EXPIRY = 14 days;
 
     struct Gift {
         address sender;
@@ -22,6 +22,9 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
         bool claimed;
         bool refunded;
         uint256 createdAt;
+        /// @notice keccak256 of the secret known only to the recipient via the claim link.
+        ///         Prevents anyone who observes the giftId on-chain from stealing the gift.
+        bytes32 claimHash;
     }
 
     mapping(bytes32 => Gift) public gifts;
@@ -33,10 +36,23 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
 
     constructor() Ownable(msg.sender) {}
 
-    function createUSDCGift(bytes32 giftId, address usdcAddress, uint256 amount) external nonReentrant {
+    /**
+     * @dev Create a USDC gift locked with a claim secret.
+     * @param giftId    Unique gift identifier (nanoid → bytes32)
+     * @param usdcAddress  ERC-20 token address (USDC)
+     * @param amount    Token amount (6 decimals for USDC)
+     * @param claimHash keccak256 of the secret — only the holder of the secret can claim
+     */
+    function createUSDCGift(
+        bytes32 giftId,
+        address usdcAddress,
+        uint256 amount,
+        bytes32 claimHash
+    ) external nonReentrant {
         require(gifts[giftId].sender == address(0), "Gift ID already exists");
         require(amount > 0, "Amount must be greater than 0");
         require(usdcAddress != address(0), "Invalid token address");
+        require(claimHash != bytes32(0), "claimHash required");
 
         IERC20(usdcAddress).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -47,19 +63,22 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             isNFT: false,
             claimed: false,
             refunded: false,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            claimHash: claimHash
         });
 
         emit GiftCreated(giftId, msg.sender, usdcAddress, amount, false);
     }
 
     /**
-     * @dev Create a gift with native ETH
-     * @param giftId Unique gift identifier
+     * @dev Create a gift with native ETH locked with a claim secret.
+     * @param giftId    Unique gift identifier
+     * @param claimHash keccak256 of the secret
      */
-    function createETHGift(bytes32 giftId) external payable nonReentrant {
+    function createETHGift(bytes32 giftId, bytes32 claimHash) external payable nonReentrant {
         require(gifts[giftId].sender == address(0), "Gift ID already exists");
         require(msg.value > 0, "Amount must be greater than 0");
+        require(claimHash != bytes32(0), "claimHash required");
 
         gifts[giftId] = Gift({
             sender: msg.sender,
@@ -68,15 +87,29 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             isNFT: false,
             claimed: false,
             refunded: false,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            claimHash: claimHash
         });
 
         emit GiftCreated(giftId, msg.sender, address(0), msg.value, false);
     }
 
-    function createNFTGift(bytes32 giftId, address nftAddress, uint256 tokenId) external nonReentrant {
+    /**
+     * @dev Create an NFT gift locked with a claim secret.
+     * @param giftId       Unique gift identifier
+     * @param nftAddress   ERC-721 contract address
+     * @param tokenId      NFT token ID
+     * @param claimHash    keccak256 of the secret
+     */
+    function createNFTGift(
+        bytes32 giftId,
+        address nftAddress,
+        uint256 tokenId,
+        bytes32 claimHash
+    ) external nonReentrant {
         require(gifts[giftId].sender == address(0), "Gift ID already exists");
         require(nftAddress != address(0), "Invalid NFT address");
+        require(claimHash != bytes32(0), "claimHash required");
 
         IERC721(nftAddress).transferFrom(msg.sender, address(this), tokenId);
 
@@ -87,17 +120,32 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             isNFT: true,
             claimed: false,
             refunded: false,
-            createdAt: block.timestamp
+            createdAt: block.timestamp,
+            claimHash: claimHash
         });
 
         emit GiftCreated(giftId, msg.sender, nftAddress, tokenId, true);
     }
 
-    function claimGift(bytes32 giftId) external nonReentrant {
+    /**
+     * @dev Claim a gift by providing the secret from the claim link.
+     *      Verifies: keccak256(abi.encodePacked(secret)) == gift.claimHash
+     * @param giftId  Gift ID
+     * @param secret  The secret value embedded in the claim link (?s=...)
+     */
+    function claimGift(bytes32 giftId, bytes32 secret) external nonReentrant {
         Gift storage gift = gifts[giftId];
         require(gift.sender != address(0), "Gift does not exist");
         require(!gift.claimed, "Gift already claimed");
         require(!gift.refunded, "Gift already refunded");
+        require(
+            keccak256(abi.encodePacked(secret)) == gift.claimHash,
+            "Invalid secret"
+        );
+        require(
+            block.timestamp < gift.createdAt + GIFT_EXPIRY,
+            "Gift has expired"
+        );
 
         gift.claimed = true;
 
@@ -116,12 +164,12 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     }
 
     /**
-     * @dev Refund gift to sender (sender-initiated, anytime before claim)
+     * @dev Refund gift to sender (sender-initiated, before expiry and before claim).
      * @param giftId Gift ID
      */
     function refundGift(bytes32 giftId) external nonReentrant {
         Gift storage gift = gifts[giftId];
-        
+
         require(gift.sender == msg.sender, "Only sender can refund");
         require(!gift.claimed, "Gift already claimed");
         require(!gift.refunded, "Gift already refunded");
@@ -134,7 +182,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     }
 
     /**
-     * @dev Refund expired gift — anyone can trigger after 7 days.
+     * @dev Refund expired gift — anyone can trigger after 14 days.
      *      Funds are returned to the original sender.
      * @param giftId Gift ID
      */
@@ -155,7 +203,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     }
 
     /**
-     * @dev Internal helper — transfer gift assets back to sender
+     * @dev Internal helper — transfer gift assets back to sender.
      */
     function _transferToSender(Gift storage gift) internal {
         if (gift.isNFT) {
@@ -175,12 +223,12 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
     }
 
     /**
-     * @dev Check gift existence and status
+     * @dev Read gift metadata.
      * @param giftId Gift ID
      */
-    function getGiftInfo(bytes32 giftId) 
-        external 
-        view 
+    function getGiftInfo(bytes32 giftId)
+        external
+        view
         returns (
             address sender,
             address tokenAddress,
@@ -189,7 +237,7 @@ contract GiftEscrow is ReentrancyGuard, Ownable, ERC721Holder {
             bool claimed,
             bool refunded,
             uint256 createdAt
-        ) 
+        )
     {
         Gift memory gift = gifts[giftId];
         return (
