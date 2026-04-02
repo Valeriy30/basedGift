@@ -46,6 +46,23 @@ export const api = {
         404: errorSchemas.notFound,
       },
     },
+    /**
+     * Called after the on-chain tx succeeds to promote a 'pending' gift to 'created'
+     * and store the escrow tx hash. Fixes the DB/blockchain sync problem:
+     * gift metadata is saved to DB *before* the blockchain tx, so a network drop
+     * after the tx cannot lose the claim link.
+     */
+    confirm: {
+      method: 'PATCH' as const,
+      path: '/api/gifts/:id/confirm',
+      input: z.object({
+        escrowTxHash: z.string(),
+      }),
+      responses: {
+        200: z.custom<typeof gifts.$inferSelect>(),
+        404: errorSchemas.notFound,
+      },
+    },
   },
 };
 

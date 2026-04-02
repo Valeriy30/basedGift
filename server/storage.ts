@@ -1,13 +1,15 @@
 import { db } from "./db";
 import { gifts, type InsertGift, type Gift, type UpdateGiftStatusRequest } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   createGift(gift: InsertGift): Promise<Gift>;
   getGift(id: string): Promise<Gift | undefined>;
   updateGiftStatus(id: string, updates: UpdateGiftStatusRequest): Promise<Gift | undefined>;
-  // For demo/dashboard purposes
+  confirmGift(id: string, escrowTxHash: string): Promise<Gift | undefined>;
   getGiftsBySender(senderAddress: string): Promise<Gift[]>;
+  /** Delete a gift only if it is still in 'pending' status (blockchain tx never confirmed). */
+  deletePendingGift(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -34,8 +36,25 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async confirmGift(id: string, escrowTxHash: string): Promise<Gift | undefined> {
+    const [updated] = await db
+      .update(gifts)
+      .set({ status: 'created', escrowTxHash })
+      .where(eq(gifts.id, id))
+      .returning();
+    return updated;
+  }
+
   async getGiftsBySender(senderAddress: string): Promise<Gift[]> {
     return await db.select().from(gifts).where(eq(gifts.senderAddress, senderAddress));
+  }
+
+  async deletePendingGift(id: string): Promise<boolean> {
+    const result = await db
+      .delete(gifts)
+      .where(and(eq(gifts.id, id), eq(gifts.status, 'pending')))
+      .returning();
+    return result.length > 0;
   }
 }
 

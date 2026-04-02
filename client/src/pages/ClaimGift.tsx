@@ -11,7 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import confetti from "canvas-confetti";
 import { Gift, ArrowDown, Wallet, Loader2, Check, ArrowLeft, AlertTriangle, Image as ImageIcon } from "lucide-react";
 import { useClaimGift as useClaimGiftContract, useGiftInfo } from '@/hooks/use-escrow';
-import { truncateAddress, truncateNFTName, TARGET_CHAIN, getChainName, getChainIcon } from '@/lib/wagmi';
+import { truncateAddress, truncateNFTName, TARGET_CHAIN, getChainName } from '@/lib/wagmi';
+import { BaseIcon } from '@/components/BaseIcon';
 import { useAccount, useSwitchChain } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -171,8 +172,8 @@ export default function ClaimGift() {
         title: "Claim failed",
         description: reason.includes("Invalid secret")
           ? "This link appears to be invalid or tampered with."
-          : reason.includes("Gift has expired")
-          ? "This gift has expired (7 days limit)."
+          : reason.includes("Gift has expired") || reason.includes("14-day")
+          ? "This gift has expired (14-day limit). It has been refunded to the sender."
           : reason.includes("rate limited")
           ? "Too many requests. Please wait a moment and try again."
           : reason.includes("user rejected")
@@ -202,11 +203,14 @@ export default function ClaimGift() {
 
   if (isGiftLoading || isLoadingGiftInfo) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center relative">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
-        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground font-medium">Fetching your gift...</p>
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center relative">
+          <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
+          <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
+          <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground font-medium">Fetching your gift...</p>
+        </div>
       </div>
     );
   }
@@ -254,7 +258,7 @@ export default function ClaimGift() {
   const isRefunded = isRefundedOnChain;
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden">
+    <div className="min-h-screen flex flex-col relative">
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
 
@@ -305,8 +309,9 @@ export default function ClaimGift() {
               </h1>
               <p className="text-muted-foreground mt-2">Tap the gift box to reveal.</p>
               {giftChainId && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {getChainIcon(giftChainId)} {getChainName(giftChainId)}
+                <p className="text-xs text-muted-foreground mt-1 flex items-center justify-center gap-1">
+                  <BaseIcon size={13} variant={giftChainId === 84532 ? 'testnet' : 'mainnet'} />
+                  {getChainName(giftChainId)}
                 </p>
               )}
             </motion.div>
@@ -353,8 +358,9 @@ export default function ClaimGift() {
                     </div>
                     <p className="text-sm font-bold uppercase tracking-widest text-foreground/60 mt-6">From {senderName}</p>
                     {giftChainId && (
-                      <p className="text-xs text-foreground/50 mt-1">
-                        {getChainIcon(giftChainId)} {getChainName(giftChainId)}
+                      <p className="text-xs text-foreground/50 mt-1 flex items-center justify-center gap-1">
+                        <BaseIcon size={12} variant={giftChainId === 84532 ? 'testnet' : 'mainnet'} />
+                        {getChainName(giftChainId)}
                       </p>
                     )}
                   </div>
@@ -388,7 +394,7 @@ export default function ClaimGift() {
                         <AlertTriangle size={32} />
                       </div>
                       <h3 className="text-xl font-bold text-amber-700">Gift Expired</h3>
-                      <p className="text-muted-foreground text-sm mt-1">This gift has been refunded to the sender.</p>
+                      <p className="text-muted-foreground text-sm mt-1">This gift was not claimed within 14 days and has been refunded to the sender.</p>
                       <Button onClick={() => setLocation('/')} variant="ghost" className="mt-4">Go Home</Button>
                     </div>
                   ) : isAlreadyClaimed ? (
@@ -407,7 +413,7 @@ export default function ClaimGift() {
                         <div className="flex-1 overflow-hidden">
                           <p className="text-xs text-muted-foreground font-bold uppercase">Destination Wallet</p>
                           <p className="font-mono text-sm flex items-center gap-2">
-                            {isConnected && <span className="text-lg">{getChainIcon(giftChainId)}</span>}
+                            {isConnected && <BaseIcon size={16} variant={giftChainId === 84532 ? 'testnet' : 'mainnet'} />}
                             {isConnected ? truncateAddress(address) : "Not Connected"}
                           </p>
                         </div>

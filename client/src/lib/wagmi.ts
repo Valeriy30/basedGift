@@ -145,17 +145,19 @@ export const ERC721_ABI = [
 
 // Escrow Contract Addresses
 export const ESCROW_CONTRACT_ADDRESS = {
-  [base.id]: '0x2856EEC9898e66684928ADe2f42F178210BB9449',
-  [baseSepolia.id]: '0x9636A9c4bD8295071d063E82433E3d021D49D05d',
+  [base.id]: '0x988372aDAf5dC3c03652D9C68a7443EE47b45c6f',
+  // New deployment — includes claimHash security + 14-day expiry
+  [baseSepolia.id]: '0x110Bdf89d9Fbc62ad355fA6cd79b79C4EE08355F',
 } as const;
 
-// Updated ABI — includes refundExpiredGift + refunded field in getGiftInfo
+// ABI matches GiftEscrow.sol — claimHash (bytes32) on create, secret (bytes32) on claim
 export const ESCROW_ABI = [
   {
     inputs: [
       { name: 'giftId', type: 'bytes32' },
       { name: 'usdcAddress', type: 'address' },
       { name: 'amount', type: 'uint256' },
+      { name: 'claimHash', type: 'bytes32' },
     ],
     name: 'createUSDCGift',
     outputs: [],
@@ -163,7 +165,10 @@ export const ESCROW_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'giftId', type: 'bytes32' }],
+    inputs: [
+      { name: 'giftId', type: 'bytes32' },
+      { name: 'claimHash', type: 'bytes32' },
+    ],
     name: 'createETHGift',
     outputs: [],
     stateMutability: 'payable',
@@ -174,6 +179,7 @@ export const ESCROW_ABI = [
       { name: 'giftId', type: 'bytes32' },
       { name: 'nftAddress', type: 'address' },
       { name: 'tokenId', type: 'uint256' },
+      { name: 'claimHash', type: 'bytes32' },
     ],
     name: 'createNFTGift',
     outputs: [],
@@ -181,7 +187,10 @@ export const ESCROW_ABI = [
     type: 'function',
   },
   {
-    inputs: [{ name: 'giftId', type: 'bytes32' }],
+    inputs: [
+      { name: 'giftId', type: 'bytes32' },
+      { name: 'secret', type: 'bytes32' },
+    ],
     name: 'claimGift',
     outputs: [],
     stateMutability: 'nonpayable',
@@ -202,13 +211,6 @@ export const ESCROW_ABI = [
     type: 'function',
   },
   {
-    inputs: [],
-    name: 'GIFT_EXPIRY',
-    outputs: [{ name: '', type: 'uint256' }],
-    stateMutability: 'view',
-    type: 'function',
-  },
-  {
     inputs: [{ name: 'giftId', type: 'bytes32' }],
     name: 'getGiftInfo',
     outputs: [
@@ -222,45 +224,6 @@ export const ESCROW_ABI = [
     ],
     stateMutability: 'view',
     type: 'function',
-  },
-  // Events
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: 'giftId', type: 'bytes32' },
-      { indexed: true, name: 'sender', type: 'address' },
-      { indexed: false, name: 'tokenAddress', type: 'address' },
-      { indexed: false, name: 'amountOrTokenId', type: 'uint256' },
-      { indexed: false, name: 'isNFT', type: 'bool' },
-    ],
-    name: 'GiftCreated',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: 'giftId', type: 'bytes32' },
-      { indexed: true, name: 'recipient', type: 'address' },
-    ],
-    name: 'GiftClaimed',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: 'giftId', type: 'bytes32' },
-      { indexed: true, name: 'sender', type: 'address' },
-    ],
-    name: 'GiftRefunded',
-    type: 'event',
-  },
-  {
-    anonymous: false,
-    inputs: [
-      { indexed: true, name: 'giftId', type: 'bytes32' },
-    ],
-    name: 'GiftExpired',
-    type: 'event',
   },
 ] as const;
 
@@ -289,9 +252,12 @@ export const getChainName = (chainId: number): string => {
   return 'Unknown';
 };
 
-// Helper: get chain icon
+/**
+ * Returns a short label for the chain.
+ * For an actual SVG logo use the <BaseIcon> component directly.
+ */
 export const getChainIcon = (chainId: number): string => {
-  if (chainId === base.id) return '🔵';
-  if (chainId === baseSepolia.id) return '🔷';
-  return '🔵';
+  if (chainId === base.id) return 'Base';
+  if (chainId === baseSepolia.id) return 'Base Sepolia';
+  return 'Base';
 };

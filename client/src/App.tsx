@@ -13,6 +13,7 @@ import Landing from "@/pages/Landing";
 import CreateGift from "@/pages/CreateGift";
 import ShareGift from "@/pages/ShareGift";
 import ClaimGift from "@/pages/ClaimGift";
+import Dashboard from "@/pages/Dashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -20,6 +21,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Landing} />
       <Route path="/create" component={CreateGift} />
+      <Route path="/dashboard" component={Dashboard} />
       <Route path="/share/:id" component={ShareGift} />
       <Route path="/claim/:id" component={ClaimGift} />
       <Route component={NotFound} />

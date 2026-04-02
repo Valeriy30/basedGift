@@ -1,6 +1,6 @@
 import { useWriteContract, useWaitForTransactionReceipt, useReadContract, useChainId } from 'wagmi';
 import { parseUnits, parseEther, stringToHex, padHex } from 'viem';
-import { ESCROW_CONTRACT_ADDRESS, ESCROW_ABI, USDC_ADDRESS, ERC721_ABI, TARGET_CHAIN, config } from '@/lib/wagmi';
+import { ESCROW_CONTRACT_ADDRESS, ESCROW_ABI, USDC_ADDRESS, ERC721_ABI, config } from '@/lib/wagmi';
 import { getPublicClient } from 'wagmi/actions';
 
 // Convert a string giftId to bytes32
@@ -10,16 +10,16 @@ export function giftIdToBytes32(giftId: string): `0x${string}` {
 
 /**
  * Helper: wait for a tx hash to be mined and check receipt status.
- * Returns the receipt so callers know the tx actually succeeded on-chain.
  */
-async function waitForTx(txHash: `0x${string}`, chainId: number) {
-  const client = getPublicClient(config, { chainId });
+async function waitForTx(txHash: `0x${string}`, chainId: number | undefined) {
+  const validChainId = chainId as 8453 | 84532 | undefined;
+  const client = getPublicClient(config, { chainId: validChainId });
   if (!client) throw new Error('No public client for chain ' + chainId);
 
   const receipt = await client.waitForTransactionReceipt({
     hash: txHash,
     confirmations: 1,
-    timeout: 120_000, // 2 min timeout — Base blocks are 2s
+    timeout: 120_000,
   });
 
   if (receipt.status === 'reverted') {
@@ -32,61 +32,55 @@ async function waitForTx(txHash: `0x${string}`, chainId: number) {
 export function useCreateUSDCGift() {
   const chainId = useChainId();
   const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
     pollingInterval: 12000,
   });
 
-  const createGift = async (giftId: string, amount: string) => {
+  /**
+   * @param giftId    nanoid string
+   * @param amount    USDC amount as human-readable string (e.g. "10.5")
+   * @param claimHash keccak256 of the secret — computed on the frontend
+   */
+  const createGift = async (giftId: string, amount: string, claimHash: `0x${string}`) => {
     const giftIdBytes = giftIdToBytes32(giftId);
     const amountWei = parseUnits(amount, 6);
 
-    // NOTE: `capabilities` / paymasterService removed — writeContractAsync
-    // does NOT support EIP-5792 capabilities. The field was silently ignored,
-    // and could cause Coinbase Smart Wallet to behave unexpectedly.
-    // If you need paymaster sponsorship, use `useSendCalls` from
-    // wagmi/experimental or OnchainKit's <Transaction> component instead.
     const txHash = await writeContractAsync({
       address: ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS],
       abi: ESCROW_ABI,
       functionName: 'createUSDCGift',
-      args: [giftIdBytes, USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS], amountWei],
+      args: [giftIdBytes, USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS], amountWei, claimHash],
       chainId,
-      // Increased from 120k: createUSDCGift does safeTransferFrom (≈65k)
-      // + new storage slot for Gift struct (≈45k) + event (≈2k) = ~112k.
-      // 200k gives safe margin.
-      gas: 200_000n,
+      gas: 220_000n,
     });
 
     console.log('[useCreateUSDCGift] tx sent:', txHash);
-
-    // Wait for on-chain confirmation before returning
     await waitForTx(txHash, chainId);
     console.log('[useCreateUSDCGift] ✅ confirmed on-chain');
 
     return txHash;
   };
 
-  return {
-    createGift,
-    isPending: isPending || isConfirming,
-    isSuccess,
-    error,
-    hash,
-  };
+  return { createGift, isPending: isPending || isConfirming, isSuccess, error, hash };
 }
 
 export function useCreateETHGift() {
   const chainId = useChainId();
   const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
     pollingInterval: 12000,
   });
 
-  const createGift = async (giftId: string, amount: string) => {
+  /**
+   * @param giftId    nanoid string
+   * @param amount    ETH amount as human-readable string
+   * @param claimHash keccak256 of the secret
+   */
+  const createGift = async (giftId: string, amount: string, claimHash: `0x${string}`) => {
     const giftIdBytes = giftIdToBytes32(giftId);
     const amountWei = parseEther(amount);
 
@@ -94,10 +88,10 @@ export function useCreateETHGift() {
       address: ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS],
       abi: ESCROW_ABI,
       functionName: 'createETHGift',
-      args: [giftIdBytes],
+      args: [giftIdBytes, claimHash],
       value: amountWei,
       chainId,
-      gas: 150_000n,
+      gas: 170_000n,
     });
 
     console.log('[useCreateETHGift] tx sent:', txHash);
@@ -107,13 +101,7 @@ export function useCreateETHGift() {
     return txHash;
   };
 
-  return {
-    createGift,
-    isPending: isPending || isConfirming,
-    isSuccess,
-    error,
-    hash,
-  };
+  return { createGift, isPending: isPending || isConfirming, isSuccess, error, hash };
 }
 
 /**
@@ -149,13 +137,7 @@ export function useApproveNFT() {
     return txHash;
   };
 
-  return {
-    approveNFT,
-    isPending: isPending || isConfirming,
-    isSuccess,
-    error,
-    hash,
-  };
+  return { approveNFT, isPending: isPending || isConfirming, isSuccess, error, hash };
 }
 
 /**
@@ -171,7 +153,18 @@ export function useCreateNFTGift() {
     pollingInterval: 12000,
   });
 
-  const createGift = async (giftId: string, nftContractAddress: string, tokenId: string) => {
+  /**
+   * @param giftId              nanoid string
+   * @param nftContractAddress  ERC-721 contract address
+   * @param tokenId             token ID as string
+   * @param claimHash           keccak256 of the secret
+   */
+  const createGift = async (
+    giftId: string,
+    nftContractAddress: string,
+    tokenId: string,
+    claimHash: `0x${string}`,
+  ) => {
     const giftIdBytes = giftIdToBytes32(giftId);
 
     console.log('[useCreateNFTGift] Creating NFT gift:', { giftId, nftContractAddress, tokenId });
@@ -180,9 +173,9 @@ export function useCreateNFTGift() {
       address: ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS],
       abi: ESCROW_ABI,
       functionName: 'createNFTGift',
-      args: [giftIdBytes, nftContractAddress as `0x${string}`, BigInt(tokenId)],
+      args: [giftIdBytes, nftContractAddress as `0x${string}`, BigInt(tokenId), claimHash],
       chainId,
-      gas: 250_000n, // NFT transfer + storage is expensive
+      gas: 270_000n,
     });
 
     console.log('[useCreateNFTGift] tx sent:', txHash);
@@ -192,109 +185,126 @@ export function useCreateNFTGift() {
     return txHash;
   };
 
-  return {
-    createGift,
-    isPending: isPending || isConfirming,
-    isSuccess,
-    error,
-    hash,
-  };
+  return { createGift, isPending: isPending || isConfirming, isSuccess, error, hash };
 }
 
 export function useClaimGift() {
   const chainId = useChainId();
   const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
-  
+
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
     pollingInterval: 12000,
   });
 
-  const claimGift = async (giftId: string, targetChainId?: number) => {
+  /**
+   * @param giftId        nanoid string
+   * @param secret        The secret value from the claim URL (?s=...)
+   * @param targetChainId Optional: override chain (use gift's chainId, not user's current chain)
+   */
+  const claimGift = async (giftId: string, secret: `0x${string}`, targetChainId?: number) => {
     const giftIdBytes = giftIdToBytes32(giftId);
     const useChain = targetChainId || chainId;
 
     console.log('[useClaimGift] Starting claim for giftId:', giftId, 'on chain:', useChain);
 
     try {
-      // FIX #4: Add gas limit to avoid estimation errors
-      // Gas estimation can fail if:
-      // - Gift already claimed
-      // - Gift doesn't exist
-      // - Wrong network
-      // Using a fixed gas limit bypasses estimation
       const txHash = await writeContractAsync({
         address: ESCROW_CONTRACT_ADDRESS[useChain as keyof typeof ESCROW_CONTRACT_ADDRESS],
         abi: ESCROW_ABI,
         functionName: 'claimGift',
-        args: [giftIdBytes],
+        args: [giftIdBytes, secret],
         chainId: useChain,
-        gas: BigInt(200000), // Fixed gas limit - bypasses estimation
+        gas: 220_000n,
       });
 
       console.log('[useClaimGift] tx sent:', txHash);
-
-      // Wait for on-chain confirmation — without this, the tx could revert
-      // silently and the UI would still show "success".
       await waitForTx(txHash, useChain);
       console.log('[useClaimGift] ✅ Claim confirmed on-chain');
 
       return txHash;
     } catch (err: any) {
       console.error('[useClaimGift] Error:', err);
-      
-      // Provide better error messages
+
       const message = err?.shortMessage || err?.message || '';
       if (message.includes('already claimed')) {
         throw new Error('This gift has already been claimed');
       } else if (message.includes('does not exist')) {
         throw new Error('Gift not found on this network');
+      } else if (message.includes('Invalid secret')) {
+        throw new Error('Invalid claim link — the secret is wrong or corrupted');
+      } else if (message.includes('Gift has expired')) {
+        throw new Error('This gift has expired (14-day limit)');
       } else if (message.includes('user rejected') || message.includes('User rejected')) {
         throw new Error('Transaction cancelled');
       }
-      
+
       throw err;
     }
   };
 
-  return {
-    claimGift,
-    isPending: isPending || isConfirming,
-    isSuccess,
-    error,
+  return { claimGift, isPending: isPending || isConfirming, isSuccess, error, hash };
+}
+
+/**
+ * Trigger an expired gift refund — can be called by anyone after 14 days.
+ */
+export function useRefundExpiredGift() {
+  const chainId = useChainId();
+  const { writeContractAsync, data: hash, isPending, error } = useWriteContract();
+
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
     hash,
+    pollingInterval: 12000,
+  });
+
+  const refundExpired = async (giftId: string, targetChainId?: number) => {
+    const giftIdBytes = giftIdToBytes32(giftId);
+    const useChain = targetChainId || chainId;
+
+    const txHash = await writeContractAsync({
+      address: ESCROW_CONTRACT_ADDRESS[useChain as keyof typeof ESCROW_CONTRACT_ADDRESS],
+      abi: ESCROW_ABI,
+      functionName: 'refundExpiredGift',
+      args: [giftIdBytes],
+      chainId: useChain,
+      gas: 150_000n,
+    });
+
+    await waitForTx(txHash, useChain);
+    return txHash;
   };
+
+  return { refundExpired, isPending: isPending || isConfirming, isSuccess, error, hash };
 }
 
 /**
  * Read on-chain gift info.
- * @param giftId - the short nanoid string
- * @param targetChainId - (optional) force reading from a specific chain
- *                        instead of the user's currently connected chain.
- *                        Critical for ClaimGift page — we must read from the
- *                        chain where the gift was created, not the user's chain.
+ * @param giftId       the short nanoid string
+ * @param targetChainId  force reading from a specific chain (use gift's chainId)
  */
 export function useGiftInfo(giftId: string | undefined, targetChainId?: number) {
   const connectedChainId = useChainId();
   const chainId = targetChainId || connectedChainId;
-  
+
   const giftIdBytes = giftId ? giftIdToBytes32(giftId) : undefined;
 
   const { data, isLoading, error, refetch } = useReadContract({
-    address: giftIdBytes ? ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS] : undefined,
+    address: giftIdBytes
+      ? ESCROW_CONTRACT_ADDRESS[chainId as keyof typeof ESCROW_CONTRACT_ADDRESS]
+      : undefined,
     abi: ESCROW_ABI,
     functionName: 'getGiftInfo',
     args: giftIdBytes ? [giftIdBytes] : undefined,
     chainId,
     query: {
       enabled: !!giftIdBytes,
-      staleTime: 30_000, // 30 seconds — reduced from 10s to lower RPC load
+      staleTime: 30_000,
       refetchOnWindowFocus: false,
-      refetchInterval: 30_000, // 30 seconds — reduced from 5s to prevent rate limiting
-    }
+      refetchInterval: 30_000,
+    },
   });
 
-  // New return shape: [sender, tokenAddress, amountOrTokenId, isNFT, claimed, refunded, createdAt]
   return {
     giftInfo: data as [string, string, bigint, boolean, boolean, boolean, bigint] | undefined,
     isLoading,

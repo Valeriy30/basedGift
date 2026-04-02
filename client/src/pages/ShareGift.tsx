@@ -4,11 +4,12 @@ import { Navbar } from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Copy, CheckCircle, ExternalLink, Gift, ArrowRight } from "lucide-react";
+import { Copy, CheckCircle, ExternalLink, Gift, ArrowRight, AlertTriangle } from "lucide-react";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
-import { truncateNFTName, getChainName, getChainIcon } from '@/lib/wagmi';
+import { truncateNFTName, getChainName } from '@/lib/wagmi';
+import { BaseIcon } from '@/components/BaseIcon';
 
 export default function ShareGift() {
   const [, params] = useRoute("/share/:id");
@@ -17,7 +18,9 @@ export default function ShareGift() {
   const { toast } = useToast();
   const [copied, setCopied] = useState(false);
 
-  const shareLink = `${window.location.origin}/claim/${giftId}`;
+  // Use the stored giftLink which contains the ?s=<secret> query param.
+  // Fallback to a plain link only for legacy records that predate the secret system.
+  const shareLink = gift.giftLink || `${window.location.origin}/claim/${giftId}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareLink);
@@ -36,9 +39,7 @@ export default function ShareGift() {
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
       
-      <div className="sticky top-0 z-50 w-full">
-        <Navbar />
-      </div>
+      <Navbar />
 
       <main className="flex-1 flex items-center justify-center p-4 relative">
         <motion.div
@@ -47,8 +48,8 @@ export default function ShareGift() {
           transition={{ duration: 0.5 }}
           className="w-full max-w-lg"
         >
-          <Card className="p-8 rounded-3xl shadow-xl border-border/50 bg-white text-center space-y-8">
-            <div className="mx-auto w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-6 relative">
+          <Card className="p-5 sm:p-8 rounded-3xl shadow-xl border-border/50 bg-white text-center space-y-5 sm:space-y-8">
+            <div className="mx-auto w-16 h-16 sm:w-20 sm:h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-4 sm:mb-6 relative">
               <motion.div 
                 initial={{ scale: 0 }} 
                 animate={{ scale: 1 }} 
@@ -60,8 +61,8 @@ export default function ShareGift() {
             </div>
 
             <div>
-              <h1 className="text-3xl font-display font-bold mb-2">Gift Wrapped!</h1>
-              <p className="text-muted-foreground text-lg">
+              <h1 className="text-2xl sm:text-3xl font-display font-bold mb-2">Gift Wrapped!</h1>
+              <p className="text-muted-foreground text-base sm:text-lg">
                 Your{' '}
                 <span className="font-bold text-foreground">
                   {gift.tokenType === 'NFT' 
@@ -75,10 +76,22 @@ export default function ShareGift() {
               </p>
               {gift.chainId && (
                 <p className="text-sm text-muted-foreground mt-2">
-                  {getChainIcon(gift.chainId)} Created on {getChainName(gift.chainId)}
+                  <span className="inline-flex items-center gap-1">
+                    <BaseIcon size={13} variant={gift.chainId === 84532 ? 'testnet' : 'mainnet'} />
+                    Created on {getChainName(gift.chainId)}
+                  </span>
                 </p>
               )}
             </div>
+
+            {!shareLink.includes('?s=') && (
+              <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-left">
+                <AlertTriangle className="text-amber-600 flex-shrink-0" size={20} />
+                <p className="text-sm text-amber-800">
+                  This link is missing the secret key — recipients <strong>cannot claim</strong>. Create a new gift to generate a secure link.
+                </p>
+              </div>
+            )}
 
             <div className="bg-muted/30 p-6 rounded-2xl border border-border/50 text-left space-y-3">
               <label className="text-sm font-bold text-muted-foreground uppercase tracking-wide">Share this link</label>

@@ -23,6 +23,21 @@ export function useGift(id: string) {
   });
 }
 
+// GET /api/gifts/sender/:address — for the sender dashboard
+export function useMyGifts(address: string | undefined) {
+  return useQuery({
+    queryKey: ['gifts', 'sender', address],
+    queryFn: async () => {
+      const res = await fetch(`/api/gifts/sender/${address}`);
+      if (!res.ok) throw new Error('Failed to fetch gifts');
+      return res.json() as Promise<import('@shared/schema').Gift[]>;
+    },
+    enabled: !!address,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
 // POST /api/gifts
 export function useCreateGift() {
   const queryClient = useQueryClient();
@@ -51,6 +66,46 @@ export function useCreateGift() {
     onSuccess: (newGift) => {
       // Pre-seed the cache for this gift so immediate navigation works smoothly
       queryClient.setQueryData([api.gifts.get.path, newGift.id], newGift);
+    },
+  });
+}
+
+// PATCH /api/gifts/:id/confirm — promotes a 'pending' gift to 'created' after blockchain success
+export function useConfirmGift() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, escrowTxHash }: { id: string; escrowTxHash: string }) => {
+      const url = buildUrl(api.gifts.confirm.path, { id });
+      const res = await fetch(url, {
+        method: api.gifts.confirm.method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ escrowTxHash }),
+      });
+
+      if (!res.ok) throw new Error('Failed to confirm gift');
+
+      return api.gifts.confirm.responses[200].parse(await res.json());
+    },
+    onSuccess: (updated) => {
+      queryClient.setQueryData([api.gifts.get.path, updated.id], updated);
+    },
+  });
+}
+
+// DELETE /api/gifts/:id/pending — cancel a stuck pending gift
+export function useCancelPendingGift() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/gifts/${id}/pending`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Could not cancel gift');
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.invalidateQueries({ queryKey: ['gifts', 'sender'] });
+      queryClient.removeQueries({ queryKey: ['/api/gifts/:id', id] });
     },
   });
 }

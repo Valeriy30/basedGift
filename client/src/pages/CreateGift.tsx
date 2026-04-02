@@ -9,16 +9,18 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ColorPicker } from "@/components/ColorPicker";
 import { NFTImage } from "@/components/NFTImage";
-import { Coins, Image as ImageIcon, Sparkles, Send, Loader2, ArrowLeft, Zap, ShoppingCart } from "lucide-react";
-import { useCreateGift } from "@/hooks/use-gifts";
+import { Coins, Image as ImageIcon, Sparkles, Send, Loader2, ArrowLeft, Zap, X } from "lucide-react";
+import { useCreateGift, useConfirmGift } from "@/hooks/use-gifts";
 import { useWallet } from "@/hooks/use-wallet";
 import { useUSDCBalance } from "@/hooks/use-usdc";
 import { useToast } from "@/hooks/use-toast";
 import { useUserNFTs } from "@/hooks/use-nft";
 import { nanoid } from "nanoid";
-import { useCreateUSDCGift, useCreateETHGift, useCreateNFTGift, useApproveNFT, giftIdToBytes32} from '@/hooks/use-escrow'; // ИЗМЕНЕНИЕ: импорт generateSecret
+import { keccak256, encodeAbiParameters, padHex, stringToHex } from 'viem';
+import { useCreateUSDCGift, useCreateETHGift, useCreateNFTGift, useApproveNFT, giftIdToBytes32 } from '@/hooks/use-escrow';
 import { useApproveUSDC } from '@/hooks/use-usdc';
-import { ESCROW_CONTRACT_ADDRESS, USDC_ADDRESS, truncateNFTName, getChainName, getChainIcon } from '@/lib/wagmi';
+import { ESCROW_CONTRACT_ADDRESS, USDC_ADDRESS, truncateNFTName, getChainName } from '@/lib/wagmi';
+import { BaseIcon } from '@/components/BaseIcon';
 import { useAccount, useSwitchChain, useChainId } from 'wagmi';
 import { useQueryClient } from '@tanstack/react-query';
 import { NFT } from "@/hooks/use-nft";
@@ -103,6 +105,7 @@ export default function CreateGift() {
   const { approveNFT, isPending: isApprovingNFT } = useApproveNFT();
   const { createGift: createNFTGiftOnChain, isPending: isCreatingNFT } = useCreateNFTGift();
   const createGift = useCreateGift();
+  const confirmGift = useConfirmGift();
 
   const [formData, setFormData] = useState({
     assetType: 'USDC',
@@ -130,7 +133,23 @@ export default function CreateGift() {
     }
     const reader = new FileReader();
     reader.onload = (e) => {
-      setFormData(prev => ({ ...prev, bgImage: e.target?.result as string }));
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 800;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', 0.72);
+        setFormData(prev => ({ ...prev, bgImage: compressed }));
+      };
+      img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -216,14 +235,55 @@ export default function CreateGift() {
       const giftIdBytes32 = giftIdToBytes32(newGiftId);
       const currentChainId = chainId as keyof typeof ESCROW_CONTRACT_ADDRESS;
       const contractAddress = ESCROW_CONTRACT_ADDRESS[currentChainId];
-
       if (!contractAddress) throw new Error("Contract not found for this network");
 
-      // ИЗМЕНЕНИЕ: генерируем secret один раз для всего подарка
-      // secret → только в URL ссылки, никогда не в БД
-      // claimHash → передаётся в контракт
-      
+      // Generate a random 32-byte secret known only to the recipient via the claim link.
+      // claimHash = keccak256(secret) is stored in the smart contract.
+      // The secret itself is NEVER sent to the server — it lives only in the URL.
+      const secret = padHex(stringToHex(nanoid(21)), { size: 32 }) as `0x${string}`;
+      const claimHash = keccak256(
+        encodeAbiParameters([{ type: 'bytes32' }], [secret])
+      ) as `0x${string}`;
 
+      // Claim link: secret embedded in ?s= query param
+      const giftLink = `${window.location.origin}/claim/${newGiftId}?s=${secret}`;
+
+      // ─── Step 0: Pre-save to DB (status='pending') ─────────────────────────
+      // Saving BEFORE the blockchain tx ensures the link is never lost even if
+      // the user loses connectivity after the tx is mined but before this callback runs.
+      setTxProgress(TX_STEPS.SAVING);
+
+      const pendingGift = await createGift.mutateAsync({
+        id: newGiftId,
+        giftId: giftIdBytes32,
+        chainId: chainId,
+        giftLink,
+        senderAddress: address,
+        tokenType: formData.assetType,
+        tokenAddress: formData.assetType === 'USDC'
+          ? USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS]
+          : formData.assetType === 'NFT'
+          ? formData.nftContractAddress
+          : null,
+        tokenId: formData.assetType === 'NFT' ? formData.nftTokenId : null,
+        amount: formData.assetType === 'NFT' ? '0' : formData.amount,
+        message: formData.message,
+        escrowTxHash: null,
+        visualAssets: {
+          senderName: formData.senderName,
+          bgImage: formData.bgImage,
+          sticker: formData.sticker,
+          colorScheme: formData.colorScheme,
+          colorScheme2: formData.colorScheme2,
+          nftContractAddress: formData.nftContractAddress,
+          nftTokenId: formData.nftTokenId,
+          nftImage: formData.nftImage,
+          nftName: formData.nftName,
+        },
+        status: 'pending',
+      });
+
+      // ─── Step 1+2: Blockchain transactions ─────────────────────────────────
       let escrowTxHash: string | undefined;
 
       if (formData.assetType === 'USDC') {
@@ -234,12 +294,11 @@ export default function CreateGift() {
 
         setTxProgress(TX_STEPS.APPROVED);
         toast({ title: "Step 1/3 ✓", description: "USDC approved! Creating gift..." });
-
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 2/3", description: "Creating gift on blockchain..." });
-        // ИЗМЕНЕНИЕ: передаём claimHash
+
         escrowTxHash = await createUSDCGiftOnChain(newGiftId, formData.amount, claimHash);
 
         setTxProgress(TX_STEPS.CREATED);
@@ -248,7 +307,7 @@ export default function CreateGift() {
       } else if (formData.assetType === 'ETH') {
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 1/2", description: "Creating gift on blockchain..." });
-        // ИЗМЕНЕНИЕ: передаём claimHash
+
         escrowTxHash = await createETHGiftOnChain(newGiftId, formData.amount, claimHash);
 
         setTxProgress(TX_STEPS.CREATED);
@@ -264,56 +323,29 @@ export default function CreateGift() {
 
         setTxProgress(TX_STEPS.APPROVED);
         toast({ title: "Step 1/3 ✓", description: "NFT approved! Creating gift..." });
-
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         setTxProgress(TX_STEPS.CREATING);
         toast({ title: "Step 2/3", description: "Creating NFT gift on blockchain..." });
-        // ИЗМЕНЕНИЕ: передаём claimHash вторым аргументом
-        escrowTxHash = await createNFTGiftOnChain(newGiftId, claimHash, formData.nftContractAddress, formData.nftTokenId);
+
+        escrowTxHash = await createNFTGiftOnChain(
+          newGiftId,
+          formData.nftContractAddress,
+          formData.nftTokenId,
+          claimHash,
+        );
 
         setTxProgress(TX_STEPS.CREATED);
         toast({ title: "Step 2/3 ✓", description: "NFT gift created on-chain!" });
       }
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
+      // ─── Step 3: Confirm DB (set status='created', store escrowTxHash) ──────
       setTxProgress(TX_STEPS.SAVING);
       toast({ title: `Step ${formData.assetType === 'ETH' ? '2/2' : '3/3'}`, description: "Saving gift..." });
 
-      // ИЗМЕНЕНИЕ: secret кладётся ТОЛЬКО в giftLink — никогда не в БД!
-      // Получатель получает ссылку вида: /claim/<giftId>?s=<secret>
-      const giftLink = `${window.location.origin}/claim/${newGiftId}?s=${secret}`;
-
-      const newGift = await createGift.mutateAsync({
-        id: newGiftId,
-        giftId: giftIdBytes32,
-        chainId: chainId,
-        giftLink,
-        senderAddress: address,
-        tokenType: formData.assetType,
-        tokenAddress: formData.assetType === 'USDC'
-          ? USDC_ADDRESS[chainId as keyof typeof USDC_ADDRESS]
-          : formData.assetType === 'NFT'
-          ? formData.nftContractAddress
-          : null,
-        tokenId: formData.assetType === 'NFT' ? formData.nftTokenId : null,
-        amount: formData.assetType === 'NFT' ? '0' : formData.amount,
-        message: formData.message,
-        escrowTxHash: escrowTxHash || null,
-        visualAssets: {
-          senderName: formData.senderName,
-          bgImage: formData.bgImage,
-          sticker: formData.sticker,
-          colorScheme: formData.colorScheme,
-          colorScheme2: formData.colorScheme2,
-          nftContractAddress: formData.nftContractAddress,
-          nftTokenId: formData.nftTokenId,
-          nftImage: formData.nftImage,
-          nftName: formData.nftName,
-        },
-        status: 'created'
-      });
+      await confirmGift.mutateAsync({ id: pendingGift.id, escrowTxHash: escrowTxHash! });
 
       refetchBalances();
       refetchUsdcBalance();
@@ -321,7 +353,7 @@ export default function CreateGift() {
 
       setTxProgress(TX_STEPS.DONE);
       toast({ title: "Success!", description: "Gift ready to share!" });
-      setLocation(`/share/${newGift.id}`);
+      setLocation(`/share/${pendingGift.id}`);
 
     } catch (error: any) {
       console.error('Full error:', error);
@@ -337,32 +369,26 @@ export default function CreateGift() {
   }, [
     address, chainId, walletChainId, formData, txProgress, isSubmitting,
     approve, approveNFT, createUSDCGiftOnChain, createETHGiftOnChain, createNFTGiftOnChain,
-    createGift, switchChainAsync, refetchBalances, refetchUsdcBalance, queryClient,
+    createGift, confirmGift, switchChainAsync, refetchBalances, refetchUsdcBalance, queryClient,
     toast, setLocation
   ]);
 
   return (
     <div className="min-h-screen flex flex-col relative">
-      <div className="sticky top-0 z-50 w-full">
-        <Navbar />
-      </div>
+      <Navbar />
       <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
       <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-12 relative">
-        <Button variant="ghost" onClick={handleBack} className="mb-4 rounded-xl">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-        </Button>
-
-        <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>{getChainIcon(chainId)}</span>
+      <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-6 relative">
+        <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+          <BaseIcon size={16} variant={chainId === 84532 ? 'testnet' : 'mainnet'} />
           <span>Creating on <strong className="text-foreground">{getChainName(chainId)}</strong></span>
         </div>
 
-        <div className="mb-12">
+        <div className="mb-8">
           <div className="flex justify-between mb-2">
             {STEPS.map((s, i) => (
-              <span key={s} className={`text-sm font-bold font-display ${i <= step ? 'text-primary' : 'text-muted-foreground'}`}>
+              <span key={s} className={`text-xs sm:text-sm font-bold font-display ${i <= step ? 'text-primary' : 'text-muted-foreground'}`}>
                 {i + 1}. {s}
               </span>
             ))}
@@ -393,35 +419,35 @@ export default function CreateGift() {
                     <p className="text-muted-foreground">Choose the asset you want to wrap.</p>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4">
                     <button
                       onClick={() => setFormData({ ...formData, assetType: 'USDC' })}
-                      className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${
+                      className={`p-4 sm:p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 sm:gap-3 ${
                         formData.assetType === 'USDC' ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/30'
                       }`}
                     >
-                      <div className="bg-blue-100 p-3 rounded-full text-blue-600"><Coins size={32} /></div>
-                      <span className="font-bold">USDC</span>
+                      <div className="bg-blue-100 p-2 sm:p-3 rounded-full text-blue-600"><Coins size={24} className="sm:w-8 sm:h-8" /></div>
+                      <span className="font-bold text-sm sm:text-base">USDC</span>
                     </button>
 
                     <button
                       onClick={() => setFormData({ ...formData, assetType: 'ETH' })}
-                      className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${
+                      className={`p-4 sm:p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 sm:gap-3 ${
                         formData.assetType === 'ETH' ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/30'
                       }`}
                     >
-                      <div className="bg-indigo-100 p-3 rounded-full text-indigo-600"><Zap size={32} /></div>
-                      <span className="font-bold">ETH</span>
+                      <div className="bg-indigo-100 p-2 sm:p-3 rounded-full text-indigo-600"><Zap size={24} className="sm:w-8 sm:h-8" /></div>
+                      <span className="font-bold text-sm sm:text-base">ETH</span>
                     </button>
 
                     <button
                       onClick={() => setFormData({ ...formData, assetType: 'NFT' })}
-                      className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${
+                      className={`p-4 sm:p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 sm:gap-3 ${
                         formData.assetType === 'NFT' ? 'border-primary bg-primary/5 shadow-md' : 'border-border hover:border-primary/30'
                       }`}
                     >
-                      <div className="bg-purple-100 p-3 rounded-full text-purple-600"><ImageIcon size={32} /></div>
-                      <span className="font-bold">NFT</span>
+                      <div className="bg-purple-100 p-2 sm:p-3 rounded-full text-purple-600"><ImageIcon size={24} className="sm:w-8 sm:h-8" /></div>
+                      <span className="font-bold text-sm sm:text-base">NFT</span>
                     </button>
                   </div>
 
@@ -445,29 +471,9 @@ export default function CreateGift() {
                           }}
                         />
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">
-                          {isConnected ? `Balance: $${parseFloat(usdcBalance).toFixed(2)} USDC` : 'Connect wallet to see balance'}
-                        </p>
-                        {isConnected && parseFloat(usdcBalance) < parseFloat(formData.amount || '0') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="gap-2 rounded-full border-blue-500 text-blue-600 hover:bg-blue-50"
-                            onClick={() => {
-                              const fundingUrl = `https://pay.coinbase.com/buy/select-asset?appId=${import.meta.env.VITE_CDP_API_KEY}&addresses={"${address}":["base"]}&assets=["USDC"]&defaultAsset=USDC&defaultNetwork=base&defaultPaymentMethod=CARD&presetFiatAmount=${Math.ceil(parseFloat(formData.amount || '0'))}`;
-                              const width = 500;
-                              const height = 700;
-                              const left = (window.screen.width / 2) - (width / 2);
-                              const top = (window.screen.height / 2) - (height / 2);
-                              window.open(fundingUrl, 'coinbaseOnramp', `width=${width},height=${height},left=${left},top=${top},toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes`);
-                            }}
-                          >
-                            <ShoppingCart className="h-4 w-4" />
-                            Buy USDC
-                          </Button>
-                        )}
-                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {isConnected ? `Balance: $${parseFloat(usdcBalance).toFixed(2)} USDC` : 'Connect wallet to see balance'}
+                      </p>
                     </div>
                   )}
 
@@ -603,7 +609,22 @@ export default function CreateGift() {
                     />
 
                     <div className="space-y-2">
-                      <Label className="text-sm text-muted-foreground">Background Photo</Label>
+                      <div className="flex items-center justify-between">
+                        <Label className="text-sm text-muted-foreground">Background Photo</Label>
+                        {formData.bgImage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({ ...prev, bgImage: '' }));
+                              const input = document.getElementById('fileInput') as HTMLInputElement | null;
+                              if (input) input.value = '';
+                            }}
+                            className="flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
+                          >
+                            <X size={12} /> Remove
+                          </button>
+                        )}
+                      </div>
                       <div
                         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                         onDragLeave={() => setIsDragging(false)}
@@ -612,13 +633,27 @@ export default function CreateGift() {
                           const file = e.dataTransfer.files[0];
                           if (file) handleFile(file);
                         }}
-                        className={`h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden relative ${
-                          isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                        }`}
-                        onClick={() => document.getElementById('fileInput')?.click()}
+                        className={`h-24 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden relative ${
+                          formData.bgImage ? '' : 'cursor-pointer'
+                        } ${isDragging ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'}`}
+                        onClick={() => { if (!formData.bgImage) document.getElementById('fileInput')?.click(); }}
                       >
                         {formData.bgImage ? (
-                          <img src={formData.bgImage} className="absolute inset-0 w-full h-full object-cover opacity-50" />
+                          <>
+                            <img src={formData.bgImage} className="absolute inset-0 w-full h-full object-cover opacity-60" />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFormData(prev => ({ ...prev, bgImage: '' }));
+                                const input = document.getElementById('fileInput') as HTMLInputElement | null;
+                                if (input) input.value = '';
+                              }}
+                              className="relative z-10 bg-black/50 hover:bg-black/70 text-white rounded-full p-1.5 transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          </>
                         ) : (
                           <>
                             <ImageIcon className="text-muted-foreground mb-1" size={20} />
@@ -705,8 +740,9 @@ export default function CreateGift() {
                       <div className="h-px bg-border w-1/2 mx-auto my-4" />
                       <p className="font-handwriting text-2xl text-foreground/80 leading-relaxed">"{formData.message}"</p>
                       <p className="text-sm font-bold text-muted-foreground mt-4">- {formData.senderName || 'A friend'}</p>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {getChainIcon(chainId)} {getChainName(chainId)}
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center justify-center gap-1">
+                        <BaseIcon size={13} variant={chainId === 84532 ? 'testnet' : 'mainnet'} />
+                        {getChainName(chainId)}
                       </p>
                     </div>
                   </div>
