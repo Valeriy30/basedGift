@@ -37,18 +37,53 @@
   --font-handwriting: 'Patrick Hand', cursive;
 }
 
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out both;
+}
+
 @layer base {
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
     background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
     background-size: 24px 24px;
+    overscroll-behavior-y: contain;
+    touch-action: pan-x pan-y;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
     @apply font-bold tracking-tight text-foreground;
   }
+}
+
+/* Force GPU compositing on sticky navbar to prevent logo flicker */
+nav[class*="sticky"] {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Prevent gradient text flicker inside blurred containers on mobile */
+.logo-text {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  isolation: isolate;
 }
 
 .gift-card-hover {

@@ -41,14 +41,15 @@ export function NetworkSelector() {
     <div className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 text-black hover:bg-white/15 hover:border-white/30 transition-all duration-200 shadow-lg"
+        className="flex items-center gap-1.5 sm:gap-2 bg-white/10 border border-white/20 rounded-xl px-2.5 sm:px-4 py-2 sm:py-2.5 text-black hover:bg-white/15 transition-colors duration-200 shadow-sm"
+        style={{ touchAction: 'manipulation' }}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {currentNetwork.icon}
-          <span className="font-medium text-sm">{currentNetwork.name}</span>
+          <span className="font-medium text-xs sm:text-sm hidden xs:inline">{currentNetwork.name}</span>
         </div>
         <ChevronDown 
-          size={16} 
+          size={14} 
           className={`transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
         />
       </button>

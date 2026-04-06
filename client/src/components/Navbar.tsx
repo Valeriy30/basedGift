@@ -9,7 +9,7 @@ export function Navbar() {
   const { isConnected } = useWallet();
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-black/[0.08] bg-white/55 backdrop-blur-2xl supports-[backdrop-filter]:bg-white/45 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
+    <nav className="sticky top-0 z-50 w-full border-b border-black/[0.08] bg-white/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 shadow-[0_1px_0_rgba(0,0,0,0.06)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-6">
@@ -17,7 +17,7 @@ export function Navbar() {
               <div className="bg-primary text-primary-foreground p-2 rounded-lg transition-transform group-hover:rotate-12">
                 <Gift size={24} strokeWidth={2.5} />
               </div>
-              <span className="font-display text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
+              <span className="logo-text font-display text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary">
                 basedGift
               </span>
             </Link>
@@ -38,9 +38,7 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <NetworkSelector />
-            </div>
+            <NetworkSelector />
             <WalletButton />
           </div>
         </div>
