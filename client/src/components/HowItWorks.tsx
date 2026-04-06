@@ -87,6 +87,7 @@ export function HowItWorks({ isOpen, onClose }: HowItWorksProps) {
                 initial={{ width: '0%' }}
                 animate={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
                 transition={{ duration: 0.3 }}
+                style={{ willChange: "width", WebkitBackfaceVisibility: "hidden" }}
               />
             </div>
           </div>
@@ -100,6 +101,7 @@ export function HowItWorks({ isOpen, onClose }: HowItWorksProps) {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.3 }}
+                style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
                 className="text-center space-y-6"
               >
                 <div className="text-8xl mb-4">{STEPS[currentStep].illustration}</div>

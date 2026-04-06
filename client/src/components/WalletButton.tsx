@@ -35,20 +35,11 @@ export function WalletButton() {
     return (
       <button
         onClick={() => connect({ connector: connectors[0] })}
-        className="
-          flex items-center gap-2
-          bg-white/10 backdrop-blur-md
-          border border-white/20
-          rounded-xl px-4 py-2.5
-          text-black
-          hover:bg-white/15
-          hover:border-white/30
-          transition-all duration-200
-          shadow-lg
-        "
+        className="flex items-center gap-2 border border-black/10 rounded-xl px-2.5 sm:px-4 py-2 text-black bg-white hover:bg-gray-50 transition-colors duration-150"
+        style={{ touchAction: 'manipulation' }}
       >
         <Wallet size={16} />
-        <span className="font-medium text-sm">Connect Wallet</span>
+        <span className="hidden sm:inline font-medium text-sm">Connect Wallet</span>
       </button>
     );
   }
@@ -60,34 +51,22 @@ export function WalletButton() {
     <div className="relative" onClick={(e) => e.stopPropagation()}>
       <button
         onClick={() => setOpen(!open)}
-        className="
-          flex items-center gap-2
-          bg-white/10 backdrop-blur-md
-          border border-white/20
-          rounded-xl px-4 py-2.5
-          text-black
-          hover:bg-white/15
-          hover:border-white/30
-          transition-all duration-200
-          shadow-lg
-        "
+        className="flex items-center gap-1.5 sm:gap-2 border border-black/10 rounded-xl px-2.5 sm:px-4 py-2 text-black bg-white hover:bg-gray-50 transition-colors duration-150"
+        style={{ touchAction: 'manipulation' }}
       >
-        {/* Wallet Icon */}
         <Wallet size={16} />
 
-        {/* Short Address */}
+        {/* Short address — even shorter on mobile */}
         <span className="font-medium text-sm">
-          {address?.slice(0, 6)}...{address?.slice(-4)}
+          <span className="sm:hidden">…{address?.slice(-4)}</span>
+          <span className="hidden sm:inline">{address?.slice(0, 6)}…{address?.slice(-4)}</span>
         </span>
 
-        {/* Online indicator */}
         <div className="w-2 h-2 bg-green-400 rounded-full" />
 
         <ChevronDown
-          size={16}
-          className={`transition-transform duration-200 ${
-            open ? "rotate-180" : ""
-          }`}
+          size={14}
+          className={`transition-transform duration-200 ${open ? "rotate-180" : ""}`}
         />
       </button>
 

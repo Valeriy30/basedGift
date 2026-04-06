@@ -9,6 +9,7 @@ import { base, baseSepolia } from 'wagmi/chains';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { MotionConfig } from "framer-motion";
 import Landing from "@/pages/Landing";
 import CreateGift from "@/pages/CreateGift";
 import ShareGift from "@/pages/ShareGift";
@@ -70,11 +71,13 @@ function App() {
             },
           }}
         >
-          <TooltipProvider>
-            <AutoChainSwitch />
-            <Toaster />
-            <Router />
-          </TooltipProvider>
+          <MotionConfig reducedMotion="user">
+            <TooltipProvider>
+              <AutoChainSwitch />
+              <Toaster />
+              <Router />
+            </TooltipProvider>
+          </MotionConfig>
         </OnchainKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

@@ -35,6 +35,7 @@ export default function Landing() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
+          style={{ willChange: "transform", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
           className="max-w-4xl mx-auto space-y-6 sm:space-y-8 w-full"
         >
           <div className="flex flex-wrap justify-center gap-2 sm:gap-3 mb-2 sm:mb-4">

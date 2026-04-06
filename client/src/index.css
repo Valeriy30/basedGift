@@ -53,13 +53,20 @@
 }
 
 @layer base {
+  html {
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-body);
     background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
     background-size: 24px 24px;
-    overscroll-behavior-y: contain;
-    touch-action: pan-x pan-y;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -68,22 +75,30 @@
   }
 }
 
-/* Force GPU compositing on sticky navbar to prevent logo flicker */
-nav[class*="sticky"] {
+/* Fixed navbar GPU compositing */
+nav[class*="fixed"] {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
-  will-change: transform;
 }
 
-/* Prevent gradient text flicker inside blurred containers on mobile */
+/* Prevent gradient logo text flicker */
 .logo-text {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
   isolation: isolate;
+}
+
+/* Force GPU layer on all Framer Motion animated elements to prevent WebView flicker */
+.motion-safe {
+  will-change: transform;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .gift-card-hover {
