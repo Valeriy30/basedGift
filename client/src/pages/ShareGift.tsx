@@ -36,8 +36,8 @@ export default function ShareGift() {
 
   return (
     <div className="min-h-screen flex flex-col relative ">
-      <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
+      <div className="bg-blob absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10" />
+      <div className="bg-blob absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
       
       <Navbar />
 
@@ -46,6 +46,7 @@ export default function ShareGift() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
+          style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
           className="w-full max-w-lg"
         >
           <Card className="p-5 sm:p-8 rounded-3xl shadow-xl border-border/50 bg-white text-center space-y-5 sm:space-y-8">
@@ -54,6 +55,7 @@ export default function ShareGift() {
                 initial={{ scale: 0 }} 
                 animate={{ scale: 1 }} 
                 transition={{ type: "spring", delay: 0.2 }}
+                style={{ willChange: "transform", WebkitBackfaceVisibility: "hidden" }}
               >
                 <CheckCircle size={40} strokeWidth={3} />
               </motion.div>

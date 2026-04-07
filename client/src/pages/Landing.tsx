@@ -28,8 +28,8 @@ export default function Landing() {
       {/* Hero Section */}
       <main className="flex-1 flex flex-col items-center justify-center text-center px-4 sm:px-6 lg:px-8 py-10 sm:py-20 relative">
         {/* Abstract Background Blobs */}
-        <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 pointer-events-none" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10 pointer-events-none" />
+        <div className="bg-blob absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10" />
+        <div className="bg-blob absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

@@ -376,8 +376,8 @@ export default function CreateGift() {
   return (
     <div className="min-h-screen flex flex-col relative">
       <Navbar />
-      <div className="absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10 animate-pulse" />
-      <div className="absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
+      <div className="bg-blob absolute top-20 left-10 w-72 h-72 bg-secondary/30 rounded-full blur-3xl -z-10" />
+      <div className="bg-blob absolute bottom-20 right-10 w-96 h-96 bg-primary/20 rounded-full blur-3xl -z-10" />
 
       <main className="flex-1 max-w-3xl w-full mx-auto px-4 py-6 relative">
         <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
@@ -399,6 +399,7 @@ export default function CreateGift() {
               initial={{ width: "0%" }}
               animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
               transition={{ duration: 0.3 }}
+              style={{ willChange: "width", WebkitBackfaceVisibility: "hidden" }}
             />
           </div>
         </div>
@@ -410,6 +411,7 @@ export default function CreateGift() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.2 }}
+            style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
           >
             <Card className="p-6 md:p-8 shadow-xl border-border/50 rounded-3xl bg-white">
               {step === 0 && (

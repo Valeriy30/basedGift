@@ -288,6 +288,7 @@ export default function ClaimGift() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 1.5, opacity: 0 }}
+              style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
               className="text-center cursor-pointer flex flex-col items-center justify-center w-full"
               onClick={() => setIsOpened(true)}
             >
@@ -295,6 +296,7 @@ export default function ClaimGift() {
                 <motion.div
                   animate={{ y: [0, -10, 0] }}
                   transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                  style={{ willChange: "transform", WebkitBackfaceVisibility: "hidden" }}
                   className="flex items-center justify-center w-full"
                 >
                   <Gift size={180} strokeWidth={1} className="text-primary fill-primary/10 drop-shadow-2xl mx-auto" />
@@ -321,6 +323,7 @@ export default function ClaimGift() {
               initial={{ opacity: 0, y: 50 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, type: "spring" }}
+              style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
               className="w-full max-w-md mx-auto"
             >
               <Card className="overflow-hidden border-none shadow-2xl rounded-3xl w-full">

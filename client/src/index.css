@@ -40,22 +40,42 @@
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translate3d(0, 20px, 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0);
   }
 }
 
 .animate-fade-in-up {
   animation: fade-in-up 0.5s ease-out both;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* Keep element on GPU layer after animation ends */
+  transform: translateZ(0);
+}
+
+/* GPU layer for blurred background blobs — prevents scroll repaint */
+.bg-blob {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+  pointer-events: none;
 }
 
 @layer base {
   html {
-    overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
+    /*
+     * overflow-x: clip clips horizontal overflow WITHOUT creating a scroll
+     * container — so vertical scrolling keeps working on all devices.
+     * Never set overflow on <body>: it turns body into the scroll root
+     * and silently breaks page scrolling on desktop and mobile.
+     */
+    overflow-x: clip;
   }
 
   body {
@@ -63,10 +83,17 @@
     font-family: var(--font-body);
     background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
     background-size: 24px 24px;
-    overflow-x: hidden;
+    /* prevent pull-to-refresh in WebView (Base App) */
     overscroll-behavior-y: none;
+    /* momentum scrolling on iOS Safari / WebKit WebViews */
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+  }
+
+  /* touch-action: pan-y only on real touch screens — never restrict desktop trackpad */
+  @media (pointer: coarse) {
+    body {
+      touch-action: pan-y;
+    }
   }
 
   h1, h2, h3, h4, h5, h6 {

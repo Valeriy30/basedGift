@@ -82,6 +82,7 @@ function GiftCard({ gift }: { gift: GiftType }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       transition={{ duration: 0.25 }}
+      style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
     >
       <Card className="overflow-hidden rounded-2xl border border-border/50 hover:shadow-lg transition-shadow">
         <div
@@ -275,6 +276,7 @@ export default function Dashboard() {
         <motion.div
           initial={{ opacity: 0, y: -12 }}
           animate={{ opacity: 1, y: 0 }}
+          style={{ willChange: "transform, opacity", WebkitBackfaceVisibility: "hidden", backfaceVisibility: "hidden" }}
           className="mb-6 sm:mb-8"
         >
           <h1 className="text-2xl sm:text-3xl font-display font-bold">My Gifts</h1>
